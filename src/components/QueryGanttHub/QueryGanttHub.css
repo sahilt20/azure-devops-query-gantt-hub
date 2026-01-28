@@ -1,0 +1,244 @@
+/**
+ * Query Gantt Hub Styles
+ */
+
+/* Main Container */
+.query-gantt-hub {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    color: #e4e4e7;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Header */
+.hub-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.hub-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hub-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    background: linear-gradient(135deg, #4299e1 0%, #667eea 50%, #9f7aea 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hub-icon {
+    font-size: 28px;
+    -webkit-text-fill-color: initial;
+}
+
+.hub-subtitle {
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+.hub-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Query Selector */
+.query-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.query-selector label {
+    font-size: 13px;
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+.query-selector select {
+    min-width: 300px;
+    padding: 10px 14px;
+    background: rgba(45, 45, 61, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e4e4e7;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.query-selector select:hover {
+    border-color: #4299e1;
+}
+
+.query-selector select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+.query-selector select option {
+    background: #1e1e2e;
+    color: #e4e4e7;
+}
+
+/* Buttons */
+.hub-btn {
+    padding: 10px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hub-btn-primary {
+    background: linear-gradient(135deg, #4299e1 0%, #667eea 100%);
+    border: none;
+    color: white;
+}
+
+.hub-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(66, 153, 225, 0.4);
+}
+
+.hub-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.hub-btn-secondary {
+    background: rgba(45, 45, 61, 0.8);
+    color: #e4e4e7;
+}
+
+.hub-btn-secondary:hover {
+    background: rgba(55, 55, 75, 0.9);
+    border-color: #4299e1;
+}
+
+/* Error Message */
+.hub-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    background: rgba(245, 101, 101, 0.1);
+    border-bottom: 1px solid rgba(245, 101, 101, 0.3);
+    color: #fc8181;
+    font-size: 14px;
+}
+
+.error-icon {
+    font-size: 18px;
+}
+
+/* Content Area */
+.hub-content {
+    flex: 1;
+    padding: 20px;
+    overflow: hidden;
+}
+
+/* Loading Overlay */
+.hub-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 15, 26, 0.9);
+    z-index: 100;
+}
+
+.hub-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #4299e1;
+    border-radius: 50%;
+    animation: hub-spin 1s linear infinite;
+}
+
+@keyframes hub-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .hub-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .hub-header-right {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .query-selector {
+        flex: 1;
+    }
+
+    .query-selector select {
+        flex: 1;
+        min-width: 200px;
+    }
+}
+
+/* Tooltip styles */
+[title] {
+    position: relative;
+}
+
+/* Progress bar animations */
+@keyframes progress-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.gantt-bar-progress {
+    animation: progress-pulse 2s ease-in-out infinite;
+}
+
+/* Selection highlight */
+.gantt-row.selected {
+    background: rgba(66, 153, 225, 0.15) !important;
+    border-left: 3px solid #4299e1;
+}

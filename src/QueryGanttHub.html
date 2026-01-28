@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Query Gantt Chart - Azure DevOps Extension</title>
+    <style>
+        /* Critical inline styles for immediate rendering */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body, #root {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e4e4e7;
+        }
+
+        /* Loading indicator */
+        .initial-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 20px;
+        }
+
+        .initial-loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #4299e1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .initial-loading-text {
+            color: #9ca3af;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <!-- Initial loading state before React mounts -->
+        <div class="initial-loading">
+            <div class="initial-loading-spinner"></div>
+            <div class="initial-loading-text">Loading Query Gantt Chart...</div>
+        </div>
+    </div>
+    
+    <!-- The bundle will be injected by webpack -->
+    <script src="QueryGanttHub.js"></script>
+</body>
+</html>

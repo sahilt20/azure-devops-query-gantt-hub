@@ -1,0 +1,158 @@
+/**
+ * Work Item Models for Azure DevOps Query Gantt Chart Extension
+ * Hierarchy: Epic → Feature → PBI (Product Backlog Item) → Task
+ */
+
+/**
+ * Represents a work item node in the hierarchy
+ */
+export interface IWorkItemNode {
+    id: number;
+    title: string;
+    workItemType: WorkItemType;
+    state: string;
+    assignedTo: string;
+
+    // Effort fields
+    effort: number;                 // Story Points / Effort (for PBI)
+    originalEstimate: number;       // Original Estimate hours (for Task)
+    remainingWork: number;          // Remaining Work hours (for Task)
+    completedWork: number;          // Completed Work hours (for Task)
+
+    // Date fields
+    startDate: Date | null;
+    targetDate: Date | null;
+
+    // Hierarchy
+    parentId: number | null;
+    children: IWorkItemNode[];
+    level: number;                  // 0=Epic, 1=Feature, 2=PBI, 3=Task
+    isExpanded: boolean;
+
+    // Calculated rollup fields
+    rollupEffort: number;           // Sum of all descendant effort/work
+    rollupCompletedWork: number;    // Sum of all descendant completed work
+    rollupRemainingWork: number;    // Sum of all descendant remaining work
+    percentComplete: number;        // (completedWork / totalWork) * 100
+
+    // Calculated date range (for Gantt positioning)
+    calculatedStartDate: Date | null;
+    calculatedEndDate: Date | null;
+}
+
+/**
+ * Work item types in the hierarchy
+ */
+export type WorkItemType = 'Epic' | 'Feature' | 'Product Backlog Item' | 'Task' | 'Bug' | 'Unknown';
+
+/**
+ * Mapping of work item type to hierarchy level
+ */
+export const WorkItemTypeLevel: Record<WorkItemType, number> = {
+    'Epic': 0,
+    'Feature': 1,
+    'Product Backlog Item': 2,
+    'Bug': 2,  // Bugs are at same level as PBI
+    'Task': 3,
+    'Unknown': 4
+};
+
+/**
+ * Colors for each work item type
+ */
+export const WorkItemTypeColors: Record<WorkItemType, string> = {
+    'Epic': '#7b68ee',       // Medium Slate Blue
+    'Feature': '#1e90ff',    // Dodger Blue
+    'Product Backlog Item': '#32cd32',  // Lime Green
+    'Bug': '#dc143c',        // Crimson
+    'Task': '#ffa500',       // Orange
+    'Unknown': '#808080'     // Gray
+};
+
+/**
+ * Icons for each work item type (Azure DevOps icon names)
+ */
+export const WorkItemTypeIcons: Record<WorkItemType, string> = {
+    'Epic': 'Crown',
+    'Feature': 'Trophy2',
+    'Product Backlog Item': 'BacklogBoard',
+    'Bug': 'Bug',
+    'Task': 'TaskBoard',
+    'Unknown': 'Unknown'
+};
+
+/**
+ * Query result from Azure DevOps
+ */
+export interface IQueryResult {
+    queryId: string;
+    queryName: string;
+    workItems: IWorkItemNode[];
+    totalCount: number;
+    executedAt: Date;
+}
+
+/**
+ * Gantt chart configuration
+ */
+export interface IGanttConfig {
+    startDate: Date;
+    endDate: Date;
+    viewMode: 'day' | 'week' | 'month';
+    showWeekends: boolean;
+    rowHeight: number;
+    headerHeight: number;
+    columnWidth: number;
+}
+
+/**
+ * Gantt row for rendering
+ */
+export interface IGanttRow {
+    workItem: IWorkItemNode;
+    isVisible: boolean;
+    barStartPercent: number;    // Position of bar start (0-100%)
+    barWidthPercent: number;    // Width of bar (0-100%)
+    progressPercent: number;    // How much of the bar is filled
+}
+
+/**
+ * Query information from Azure DevOps
+ */
+export interface IQueryInfo {
+    id: string;
+    name: string;
+    path: string;
+    queryType: 'flat' | 'tree' | 'oneHop';
+    isFolder: boolean;
+}
+
+/**
+ * Create an empty work item node with default values
+ */
+export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): IWorkItemNode {
+    return {
+        id: 0,
+        title: '',
+        workItemType: 'Unknown',
+        state: '',
+        assignedTo: '',
+        effort: 0,
+        originalEstimate: 0,
+        remainingWork: 0,
+        completedWork: 0,
+        startDate: null,
+        targetDate: null,
+        parentId: null,
+        children: [],
+        level: 0,
+        isExpanded: true,
+        rollupEffort: 0,
+        rollupCompletedWork: 0,
+        rollupRemainingWork: 0,
+        percentComplete: 0,
+        calculatedStartDate: null,
+        calculatedEndDate: null,
+        ...partial
+    };
+}

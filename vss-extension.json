@@ -1,0 +1,53 @@
+{
+    "manifestVersion": 1,
+    "id": "query-gantt-hub",
+    "version": "1.0.0",
+    "name": "Query Gantt Chart",
+    "description": "Adds a Gantt Chart view to Azure DevOps Queries with effort rollup from Epic → Feature → PBI → Task",
+    "publisher": "your-publisher-id",
+    "categories": [
+        "Azure Boards"
+    ],
+    "targets": [
+        {
+            "id": "Microsoft.VisualStudio.Services"
+        }
+    ],
+    "icons": {
+        "default": "static/images/gantt-icon.png"
+    },
+    "scopes": [
+        "vso.work"
+    ],
+    "demands": [
+        "contribution/ms.vss-web.platform-common"
+    ],
+    "contributions": [
+        {
+            "id": "query-gantt-hub",
+            "type": "ms.vss-web.hub",
+            "targets": [
+                "ms.vss-work-web.work-hub-group"
+            ],
+            "properties": {
+                "name": "Query Gantt Chart",
+                "order": 99,
+                "uri": "dist/QueryGanttHub.html",
+                "icon": {
+                    "light": "static/images/gantt-icon.png",
+                    "dark": "static/images/gantt-icon.png"
+                }
+            }
+        }
+    ],
+    "files": [
+        {
+            "path": "dist",
+            "addressable": true
+        },
+        {
+            "path": "static",
+            "addressable": true
+        }
+    ]
+}

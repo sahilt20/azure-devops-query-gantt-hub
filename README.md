@@ -1,0 +1,125 @@
+# Azure DevOps Query Gantt Chart Extension
+
+A custom Azure DevOps extension that adds a **Gantt Chart** hub to visualize work items from **Epic → Feature → PBI → Task** with automatic effort rollup and percent complete calculations.
+
+## Features
+
+- 📊 **Gantt Chart Visualization** - View work items on a timeline with progress bars
+- 🔄 **Effort Rollup** - Automatically calculates effort from Task level up
+- 📈 **Percent Complete** - Shows completion percentage at each level
+- 🌳 **Hierarchical View** - Collapsible tree structure (Epic → Feature → PBI → Task)
+- 🔍 **Query Integration** - Execute any Azure DevOps query and visualize results
+- 🎨 **Modern UI** - Dark theme with smooth animations and glassmorphism effects
+
+## Work Item Hierarchy
+
+```
+Epic (Level 0)
+└── Feature (Level 1)
+    └── Product Backlog Item (Level 2)
+        └── Task (Level 3)
+```
+
+## Effort Rollup Logic
+
+- **Tasks**: Use `Original Estimate`, `Remaining Work`, and `Completed Work` fields
+- **Parent Items**: Sum of all descendant effort values
+- **Percent Complete**: `(Completed Work / Total Effort) × 100`
+
+## Installation
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm 9+
+- Azure DevOps organization
+- TFX CLI (`npm install -g tfx-cli`)
+
+### Build & Package
+
+```bash
+# Install dependencies
+npm install
+
+# Build the extension
+npm run build
+
+# Package for distribution
+npm run package
+```
+
+This creates a `.vsix` file that can be uploaded to the Azure DevOps Marketplace.
+
+### Local Development
+
+```bash
+# Start development server
+npm run start:dev
+```
+
+Then configure your Azure DevOps organization to load the extension from `https://localhost:3000`.
+
+## Configuration
+
+### Update Publisher ID
+
+Edit `vss-extension.json` and replace `your-publisher-id` with your Azure DevOps Marketplace publisher ID:
+
+```json
+{
+    "publisher": "your-actual-publisher-id"
+}
+```
+
+### Required Scopes
+
+The extension requires the following Azure DevOps scopes:
+- `vso.work` - Read work items and queries
+
+## Usage
+
+1. Navigate to **Azure Boards** in your Azure DevOps project
+2. Click on **Query Gantt Chart** in the hub navigation
+3. Select a query from the dropdown or click **Load All Work Items**
+4. The Gantt chart displays with:
+   - Work item hierarchy on the left
+   - Timeline with progress bars on the right
+   - Effort rollup and percent complete for each item
+
+## Project Structure
+
+```
+azure-devops-query-ui-hub/
+├── src/
+│   ├── components/
+│   │   ├── GanttChart/
+│   │   │   ├── GanttChart.tsx     # Main Gantt component
+│   │   │   ├── GanttRow.tsx       # Work item row
+│   │   │   ├── GanttBar.tsx       # Progress bar
+│   │   │   ├── GanttTimeline.tsx  # Timeline header
+│   │   │   └── GanttChart.css     # Styles
+│   │   └── QueryGanttHub/
+│   │       ├── QueryGanttHub.tsx  # Main hub component
+│   │       └── QueryGanttHub.css  # Hub styles
+│   ├── services/
+│   │   ├── AzureDevOpsService.ts     # API integration
+│   │   ├── WorkItemHierarchyService.ts # Hierarchy building
+│   │   └── EffortRollupService.ts    # Effort calculations
+│   ├── models/
+│   │   └── WorkItemModels.ts      # TypeScript interfaces
+│   ├── utils/
+│   │   └── DateUtils.ts           # Date helpers
+│   ├── QueryGanttHub.tsx          # Entry point
+│   └── QueryGanttHub.html         # HTML template
+├── static/
+│   └── images/
+│       └── gantt-icon.png         # Extension icon
+├── vss-extension.json             # Extension manifest
+├── package.json
+├── tsconfig.json
+└── webpack.config.js
+```
+
+## License
+
+MIT
