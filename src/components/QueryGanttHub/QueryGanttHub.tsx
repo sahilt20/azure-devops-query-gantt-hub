@@ -3,26 +3,40 @@
  * Main hub component that integrates with Azure DevOps Queries
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
 import { IWorkItemNode, IQueryInfo } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { workItemHierarchyService } from '../../services/WorkItemHierarchyService';
 import { effortRollupService } from '../../services/EffortRollupService';
+import { generateSampleWorkItems, sampleQueries } from '../../services/MockDataService';
 import { GanttChart } from '../GanttChart/GanttChart';
 import './QueryGanttHub.css';
 
+// Check if running in development mode (localhost)
+const isDevelopment = typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
 export const QueryGanttHub: React.FC = () => {
-    const [queries, setQueries] = useState<IQueryInfo[]>([]);
-    const [selectedQueryId, setSelectedQueryId] = useState<string>('');
-    const [workItems, setWorkItems] = useState<IWorkItemNode[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isLoadingQueries, setIsLoadingQueries] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [projectName, setProjectName] = useState<string>('');
+    const [queries, setQueries] = React.useState<IQueryInfo[]>([]);
+    const [selectedQueryId, setSelectedQueryId] = React.useState<string>('');
+    const [workItems, setWorkItems] = React.useState<IWorkItemNode[]>([]);
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [isLoadingQueries, setIsLoadingQueries] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
+    const [projectName, setProjectName] = React.useState<string>('');
+    const [useMockData, setUseMockData] = React.useState(isDevelopment);
 
     // Initialize SDK and load queries
-    useEffect(() => {
+    React.useEffect(() => {
         const init = async () => {
+            if (useMockData) {
+                // Use mock data for local development
+                setQueries(sampleQueries);
+                setProjectName('SampleProject');
+                setIsLoadingQueries(false);
+                return;
+            }
+
             try {
                 await azureDevOpsService.initialize();
                 setProjectName(azureDevOpsService.getProjectName() || '');
@@ -31,23 +45,36 @@ export const QueryGanttHub: React.FC = () => {
                 setQueries(loadedQueries);
             } catch (err) {
                 console.error('Failed to initialize:', err);
-                setError('Failed to initialize Azure DevOps SDK');
+                setError('Failed to initialize Azure DevOps SDK. Running with sample data.');
+                // Fallback to mock data
+                setUseMockData(true);
+                setQueries(sampleQueries);
+                setProjectName('SampleProject');
             } finally {
                 setIsLoadingQueries(false);
             }
         };
 
         init();
-    }, []);
+    }, [useMockData]);
 
     // Execute selected query
-    const executeQuery = useCallback(async (queryId: string) => {
+    const executeQuery = React.useCallback(async (queryId: string) => {
         if (!queryId) return;
 
         setIsLoading(true);
         setError(null);
 
         try {
+            if (useMockData) {
+                // Simulate loading delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const mockData = generateSampleWorkItems();
+                effortRollupService.calculateRollup(mockData);
+                setWorkItems(mockData);
+                return;
+            }
+
             // Execute the query
             const queryResult = await azureDevOpsService.executeQuery(queryId);
 
@@ -99,7 +126,7 @@ export const QueryGanttHub: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [useMockData]);
 
     // Handle query selection
     const handleQueryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -113,18 +140,31 @@ export const QueryGanttHub: React.FC = () => {
     };
 
     // Handle work item click - open in Azure DevOps
-    const handleWorkItemClick = useCallback((workItem: IWorkItemNode) => {
+    const handleWorkItemClick = React.useCallback((workItem: IWorkItemNode) => {
+        if (useMockData) {
+            alert(`Work Item #${workItem.id}: ${workItem.title}\n\nType: ${workItem.workItemType}\nState: ${workItem.state}\nEffort: ${workItem.rollupEffort}h\nComplete: ${workItem.percentComplete}%`);
+            return;
+        }
         const url = `${window.location.origin}/${projectName}/_workitems/edit/${workItem.id}`;
         window.open(url, '_blank');
-    }, [projectName]);
+    }, [projectName, useMockData]);
 
-    // Load all hierarchical items
-    const loadAllHierarchical = useCallback(async () => {
+    // Load all hierarchical items or sample data
+    const loadAllHierarchical = React.useCallback(async () => {
         setIsLoading(true);
         setError(null);
         setSelectedQueryId('');
 
         try {
+            if (useMockData) {
+                // Simulate loading delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const mockData = generateSampleWorkItems();
+                effortRollupService.calculateRollup(mockData);
+                setWorkItems(mockData);
+                return;
+            }
+
             const rawWorkItems = await azureDevOpsService.getHierarchicalWorkItems();
             const hierarchy = workItemHierarchyService.buildHierarchy(rawWorkItems);
             effortRollupService.calculateRollup(hierarchy);
@@ -135,7 +175,15 @@ export const QueryGanttHub: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [useMockData]);
+
+    // Toggle mock data mode
+    const toggleMockData = () => {
+        setUseMockData(!useMockData);
+        setWorkItems([]);
+        setSelectedQueryId('');
+        setError(null);
+    };
 
     return (
         <div className="query-gantt-hub">
@@ -148,9 +196,20 @@ export const QueryGanttHub: React.FC = () => {
                     </h1>
                     <span className="hub-subtitle">
                         Visualize work items from Epic → Feature → PBI → Task with effort rollup
+                        {useMockData && <span className="mock-badge"> (Sample Data)</span>}
                     </span>
                 </div>
                 <div className="hub-header-right">
+                    {/* Mock Data Toggle - only in dev mode */}
+                    {isDevelopment && (
+                        <button
+                            className={`hub-btn ${useMockData ? 'hub-btn-active' : 'hub-btn-secondary'}`}
+                            onClick={toggleMockData}
+                        >
+                            {useMockData ? '🎭 Using Sample Data' : '🔗 Connect to Azure'}
+                        </button>
+                    )}
+
                     {/* Query Selector */}
                     <div className="query-selector">
                         <label htmlFor="query-select">Select Query:</label>
@@ -175,7 +234,7 @@ export const QueryGanttHub: React.FC = () => {
                         onClick={loadAllHierarchical}
                         disabled={isLoading}
                     >
-                        Load All Work Items
+                        {useMockData ? 'Load Sample Data' : 'Load All Work Items'}
                     </button>
                 </div>
             </div>

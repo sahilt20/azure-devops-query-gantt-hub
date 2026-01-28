@@ -50,12 +50,12 @@ module.exports = {
         static: {
             directory: path.join(__dirname, 'dist')
         },
-        port: 3000,
+        port: 3001,
         hot: true,
         headers: {
             'Access-Control-Allow-Origin': '*'
         },
-        https: true
+        server: 'https'
     },
     devtool: 'source-map'
 };

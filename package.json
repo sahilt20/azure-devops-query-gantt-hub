@@ -14,7 +14,8 @@
     "azure-devops-extension-api": "^4.233.0",
     "azure-devops-extension-sdk": "^4.0.2",
     "react": "^16.14.0",
-    "react-dom": "^16.14.0"
+    "react-dom": "^16.14.0",
+    "tfx-cli": "^0.23.1"
   },
   "devDependencies": {
     "@types/react": "^16.14.0",
