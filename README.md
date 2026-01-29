@@ -2,6 +2,17 @@
 
 A custom Azure DevOps extension that adds a **Gantt Chart** hub to visualize work items from **Epic → Feature → PBI → Task** with automatic effort rollup and percent complete calculations.
 
+## Screenshots
+
+### Gantt Chart with Sample Data
+![Gantt Chart with Data](docs/screenshots/gantt-with-data.png)
+
+### Expanded Hierarchy View
+![Expanded View](docs/screenshots/gantt-expanded.png)
+
+### Week View Mode
+![Week View](docs/screenshots/gantt-week-view.png)
+
 ## Features
 
 - 📊 **Gantt Chart Visualization** - View work items on a timeline with progress bars
@@ -10,6 +21,7 @@ A custom Azure DevOps extension that adds a **Gantt Chart** hub to visualize wor
 - 🌳 **Hierarchical View** - Collapsible tree structure (Epic → Feature → PBI → Task)
 - 🔍 **Query Integration** - Execute any Azure DevOps query and visualize results
 - 🎨 **Modern UI** - Dark theme with smooth animations and glassmorphism effects
+- 📅 **Multiple View Modes** - Day, Week, and Month timeline views
 
 ## Work Item Hierarchy
 
@@ -57,7 +69,7 @@ This creates a `.vsix` file that can be uploaded to the Azure DevOps Marketplace
 npm run start:dev
 ```
 
-Then configure your Azure DevOps organization to load the extension from `https://localhost:3000`.
+The dev server runs at `https://localhost:3001`. The extension automatically uses sample data when running locally.
 
 ## Configuration
 
@@ -86,6 +98,14 @@ The extension requires the following Azure DevOps scopes:
    - Timeline with progress bars on the right
    - Effort rollup and percent complete for each item
 
+### Toolbar Controls
+
+| Control            | Description                |
+| ------------------ | -------------------------- |
+| **Day/Week/Month** | Switch timeline view modes |
+| **Expand All**     | Expand entire hierarchy    |
+| **Collapse All**   | Collapse to top level      |
+
 ## Project Structure
 
 ```
@@ -104,13 +124,16 @@ azure-devops-query-ui-hub/
 │   ├── services/
 │   │   ├── AzureDevOpsService.ts     # API integration
 │   │   ├── WorkItemHierarchyService.ts # Hierarchy building
-│   │   └── EffortRollupService.ts    # Effort calculations
+│   │   ├── EffortRollupService.ts    # Effort calculations
+│   │   └── MockDataService.ts        # Sample data for testing
 │   ├── models/
 │   │   └── WorkItemModels.ts      # TypeScript interfaces
 │   ├── utils/
 │   │   └── DateUtils.ts           # Date helpers
 │   ├── QueryGanttHub.tsx          # Entry point
 │   └── QueryGanttHub.html         # HTML template
+├── docs/
+│   └── screenshots/               # UI screenshots
 ├── static/
 │   └── images/
 │       └── gantt-icon.png         # Extension icon
