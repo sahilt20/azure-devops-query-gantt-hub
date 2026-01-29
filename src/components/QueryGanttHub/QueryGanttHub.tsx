@@ -23,6 +23,7 @@ export const QueryGanttHub: React.FC = () => {
     const [isLoading, setIsLoading] = React.useState(false);
     const [isLoadingQueries, setIsLoadingQueries] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
+    const [debugInfo, setDebugInfo] = React.useState<string>('');
     const [projectName, setProjectName] = React.useState<string>('');
     const [useMockData, setUseMockData] = React.useState(isDevelopment);
 
@@ -33,23 +34,35 @@ export const QueryGanttHub: React.FC = () => {
                 // Use mock data for local development
                 setQueries(sampleQueries);
                 setProjectName('SampleProject');
+                setDebugInfo('Using mock data (localhost detected)');
                 setIsLoadingQueries(false);
                 return;
             }
 
             try {
+                setDebugInfo('Initializing Azure DevOps SDK...');
                 await azureDevOpsService.initialize();
-                setProjectName(azureDevOpsService.getProjectName() || '');
 
-                const loadedQueries = await azureDevOpsService.getQueries(3);
+                const project = azureDevOpsService.getProjectName();
+                setProjectName(project || '');
+                setDebugInfo(`Connected to project: ${project || 'Unknown'}`);
+
+                if (!project) {
+                    const initError = azureDevOpsService.getInitError();
+                    setError(initError || 'Could not determine project context');
+                    setIsLoadingQueries(false);
+                    return;
+                }
+
+                setDebugInfo('Loading queries...');
+                const loadedQueries = await azureDevOpsService.getQueries(5);
                 setQueries(loadedQueries);
+                setDebugInfo(`Loaded ${loadedQueries.length} queries from ${project}`);
             } catch (err) {
                 console.error('Failed to initialize:', err);
-                setError('Failed to initialize Azure DevOps SDK. Running with sample data.');
-                // Fallback to mock data
-                setUseMockData(true);
-                setQueries(sampleQueries);
-                setProjectName('SampleProject');
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                setError(`Failed to initialize: ${errorMessage}`);
+                setDebugInfo(`Error: ${errorMessage}`);
             } finally {
                 setIsLoadingQueries(false);
             }
@@ -72,8 +85,11 @@ export const QueryGanttHub: React.FC = () => {
                 const mockData = generateSampleWorkItems();
                 effortRollupService.calculateRollup(mockData);
                 setWorkItems(mockData);
+                setDebugInfo(`Loaded ${mockData.length} sample work items`);
                 return;
             }
+
+            setDebugInfo('Executing query...');
 
             // Execute the query
             const queryResult = await azureDevOpsService.executeQuery(queryId);
@@ -81,10 +97,11 @@ export const QueryGanttHub: React.FC = () => {
             // Get work item IDs from result
             let workItemIds: number[] = [];
 
-            if (queryResult.workItems) {
+            if (queryResult.workItems && queryResult.workItems.length > 0) {
                 // Flat query
                 workItemIds = queryResult.workItems.map(wi => wi.id);
-            } else if (queryResult.workItemRelations) {
+                setDebugInfo(`Query returned ${workItemIds.length} work items (flat query)`);
+            } else if (queryResult.workItemRelations && queryResult.workItemRelations.length > 0) {
                 // Tree/OneHop query
                 const ids = new Set<number>();
                 for (const relation of queryResult.workItemRelations) {
@@ -92,6 +109,11 @@ export const QueryGanttHub: React.FC = () => {
                     if (relation.target?.id) ids.add(relation.target.id);
                 }
                 workItemIds = Array.from(ids);
+                setDebugInfo(`Query returned ${workItemIds.length} work items (tree/link query with ${queryResult.workItemRelations.length} relations)`);
+            } else {
+                setDebugInfo('Query returned no results');
+                setWorkItems([]);
+                return;
             }
 
             if (workItemIds.length === 0) {
@@ -99,13 +121,16 @@ export const QueryGanttHub: React.FC = () => {
                 return;
             }
 
+            setDebugInfo(`Fetching ${workItemIds.length} work items...`);
+
             // Fetch work items with details
             const rawWorkItems = await azureDevOpsService.getWorkItems(workItemIds);
+            setDebugInfo(`Retrieved ${rawWorkItems.length} work items, building hierarchy...`);
 
             // Build hierarchy
             let hierarchy: IWorkItemNode[];
 
-            if (queryResult.workItemRelations) {
+            if (queryResult.workItemRelations && queryResult.workItemRelations.length > 0) {
                 // Use relations from query
                 hierarchy = workItemHierarchyService.buildHierarchyFromRelations(
                     rawWorkItems,
@@ -120,9 +145,12 @@ export const QueryGanttHub: React.FC = () => {
             effortRollupService.calculateRollup(hierarchy);
 
             setWorkItems(hierarchy);
+            setDebugInfo(`Displaying ${hierarchy.length} root items with ${rawWorkItems.length} total work items`);
         } catch (err) {
             console.error('Failed to execute query:', err);
-            setError(`Failed to execute query: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            setError(`Failed to execute query: ${errorMessage}`);
+            setDebugInfo(`Query error: ${errorMessage}`);
         } finally {
             setIsLoading(false);
         }
@@ -162,16 +190,23 @@ export const QueryGanttHub: React.FC = () => {
                 const mockData = generateSampleWorkItems();
                 effortRollupService.calculateRollup(mockData);
                 setWorkItems(mockData);
+                setDebugInfo(`Loaded ${mockData.length} sample work items`);
                 return;
             }
 
+            setDebugInfo('Loading all work items...');
             const rawWorkItems = await azureDevOpsService.getHierarchicalWorkItems();
+            setDebugInfo(`Found ${rawWorkItems.length} work items, building hierarchy...`);
+
             const hierarchy = workItemHierarchyService.buildHierarchy(rawWorkItems);
             effortRollupService.calculateRollup(hierarchy);
             setWorkItems(hierarchy);
+            setDebugInfo(`Displaying ${hierarchy.length} root items with ${rawWorkItems.length} total work items`);
         } catch (err) {
             console.error('Failed to load hierarchical items:', err);
-            setError(`Failed to load: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            setError(`Failed to load: ${errorMessage}`);
+            setDebugInfo(`Error: ${errorMessage}`);
         } finally {
             setIsLoading(false);
         }
@@ -183,6 +218,7 @@ export const QueryGanttHub: React.FC = () => {
         setWorkItems([]);
         setSelectedQueryId('');
         setError(null);
+        setDebugInfo('');
     };
 
     return (
@@ -219,7 +255,7 @@ export const QueryGanttHub: React.FC = () => {
                             onChange={handleQueryChange}
                             disabled={isLoadingQueries || isLoading}
                         >
-                            <option value="">-- Select a Query --</option>
+                            <option value="">-- Select a Query ({queries.length} available) --</option>
                             {queries.map(q => (
                                 <option key={q.id} value={q.id}>
                                     {q.path}
@@ -238,6 +274,14 @@ export const QueryGanttHub: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Debug Info */}
+            {debugInfo && (
+                <div className="hub-debug">
+                    <span className="debug-icon">ℹ️</span>
+                    {debugInfo}
+                </div>
+            )}
 
             {/* Error Message */}
             {error && (

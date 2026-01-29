@@ -11,7 +11,7 @@ import {
     WorkItemQueryResult,
     QueryExpand
 } from 'azure-devops-extension-api/WorkItemTracking';
-import { getClient, IProjectPageService, CommonServiceIds } from 'azure-devops-extension-api';
+import { getClient, IProjectPageService, CommonServiceIds, IHostPageLayoutService } from 'azure-devops-extension-api';
 import { IQueryInfo } from '../models/WorkItemModels';
 
 /**
@@ -24,9 +24,13 @@ const WORK_ITEM_FIELDS = [
     'System.State',
     'System.AssignedTo',
     'System.Parent',
+    'System.IterationPath',
+    'System.AreaPath',
     'Microsoft.VSTS.Scheduling.StartDate',
     'Microsoft.VSTS.Scheduling.TargetDate',
+    'Microsoft.VSTS.Scheduling.FinishDate',
     'Microsoft.VSTS.Scheduling.Effort',
+    'Microsoft.VSTS.Scheduling.StoryPoints',
     'Microsoft.VSTS.Scheduling.OriginalEstimate',
     'Microsoft.VSTS.Scheduling.RemainingWork',
     'Microsoft.VSTS.Scheduling.CompletedWork',
@@ -38,6 +42,7 @@ class AzureDevOpsService {
     private projectId: string | null = null;
     private projectName: string | null = null;
     private initialized = false;
+    private initError: string | null = null;
 
     private constructor() { }
 
@@ -54,20 +59,43 @@ class AzureDevOpsService {
     public async initialize(): Promise<void> {
         if (this.initialized) return;
 
-        await SDK.init();
-        await SDK.ready();
+        try {
+            console.log('[AzureDevOpsService] Initializing SDK...');
+            await SDK.init();
+            console.log('[AzureDevOpsService] SDK initialized, waiting for ready...');
+            await SDK.ready();
+            console.log('[AzureDevOpsService] SDK ready');
 
-        const projectService = await SDK.getService<IProjectPageService>(
-            CommonServiceIds.ProjectPageService
-        );
-        const project = await projectService.getProject();
+            const projectService = await SDK.getService<IProjectPageService>(
+                CommonServiceIds.ProjectPageService
+            );
+            console.log('[AzureDevOpsService] Got project service');
 
-        if (project) {
-            this.projectId = project.id;
-            this.projectName = project.name;
+            const project = await projectService.getProject();
+            console.log('[AzureDevOpsService] Project:', project);
+
+            if (project) {
+                this.projectId = project.id;
+                this.projectName = project.name;
+                console.log(`[AzureDevOpsService] Project ID: ${this.projectId}, Name: ${this.projectName}`);
+            } else {
+                this.initError = 'Could not get project context. Make sure the extension is loaded within an Azure DevOps project.';
+                console.error('[AzureDevOpsService] No project found');
+            }
+
+            this.initialized = true;
+        } catch (error) {
+            this.initError = `SDK initialization failed: ${error instanceof Error ? error.message : String(error)}`;
+            console.error('[AzureDevOpsService] Initialization error:', error);
+            throw error;
         }
+    }
 
-        this.initialized = true;
+    /**
+     * Get initialization error if any
+     */
+    public getInitError(): string | null {
+        return this.initError;
     }
 
     /**
@@ -94,17 +122,30 @@ class AzureDevOpsService {
     /**
      * Get all queries in the project
      */
-    public async getQueries(depth: number = 2): Promise<IQueryInfo[]> {
+    public async getQueries(depth: number = 5): Promise<IQueryInfo[]> {
         await this.initialize();
 
         if (!this.projectId) {
-            throw new Error('Project not found');
+            console.error('[AzureDevOpsService] Cannot get queries - no project ID');
+            throw new Error('Project not found. ' + (this.initError || ''));
         }
 
-        const client = this.getWitClient();
-        const queries = await client.getQueries(this.projectId, QueryExpand.All, depth);
+        try {
+            console.log(`[AzureDevOpsService] Fetching queries with depth ${depth}...`);
+            const client = this.getWitClient();
 
-        return this.flattenQueries(queries);
+            // Get both "Shared Queries" and "My Queries" folders
+            const queries = await client.getQueries(this.projectId, QueryExpand.All, depth);
+            console.log(`[AzureDevOpsService] Got ${queries.length} top-level query folders`);
+
+            const flattenedQueries = this.flattenQueries(queries);
+            console.log(`[AzureDevOpsService] Flattened to ${flattenedQueries.length} queries`);
+
+            return flattenedQueries;
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error fetching queries:', error);
+            throw new Error(`Failed to fetch queries: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     /**
@@ -114,14 +155,25 @@ class AzureDevOpsService {
         const result: IQueryInfo[] = [];
 
         for (const query of queries) {
-            const currentPath = path ? `${path}/${query.name}` : query.name;
+            const currentPath = path ? `${path}/${query.name}` : query.name || 'Unknown';
 
-            if (!query.isFolder) {
+            if (!query.isFolder && query.id) {
+                // Determine query type from queryType enum
+                let queryType: 'flat' | 'oneHop' | 'tree' = 'flat';
+                if (query.queryType !== undefined) {
+                    switch (query.queryType) {
+                        case 1: queryType = 'flat'; break;
+                        case 2: queryType = 'oneHop'; break;
+                        case 3: queryType = 'tree'; break;
+                        default: queryType = 'flat';
+                    }
+                }
+
                 result.push({
                     id: query.id,
-                    name: query.name,
+                    name: query.name || 'Unnamed Query',
                     path: currentPath,
-                    queryType: query.queryType === 1 ? 'flat' : query.queryType === 2 ? 'oneHop' : 'tree',
+                    queryType: queryType,
                     isFolder: false
                 });
             }
@@ -144,8 +196,20 @@ class AzureDevOpsService {
             throw new Error('Project not found');
         }
 
-        const client = this.getWitClient();
-        return await client.queryById(queryId, this.projectId);
+        try {
+            console.log(`[AzureDevOpsService] Executing query: ${queryId}`);
+            const client = this.getWitClient();
+            const result = await client.queryById(queryId, this.projectId);
+
+            const itemCount = result.workItems?.length || 0;
+            const relationCount = result.workItemRelations?.length || 0;
+            console.log(`[AzureDevOpsService] Query returned ${itemCount} items, ${relationCount} relations`);
+
+            return result;
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error executing query:', error);
+            throw new Error(`Failed to execute query: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     /**
@@ -155,29 +219,42 @@ class AzureDevOpsService {
         await this.initialize();
 
         if (!this.projectId || ids.length === 0) {
+            console.log('[AzureDevOpsService] getWorkItems: no project or empty ids');
             return [];
         }
 
-        const client = this.getWitClient();
+        try {
+            console.log(`[AzureDevOpsService] Fetching ${ids.length} work items...`);
+            const client = this.getWitClient();
 
-        // Azure DevOps API limits to 200 work items per request
-        const batchSize = 200;
-        const allWorkItems: WorkItem[] = [];
+            // Azure DevOps API limits to 200 work items per request
+            const batchSize = 200;
+            const allWorkItems: WorkItem[] = [];
 
-        for (let i = 0; i < ids.length; i += batchSize) {
-            const batch = ids.slice(i, i + batchSize);
-            const workItems = await client.getWorkItems(
-                batch,
-                this.projectId,
-                WORK_ITEM_FIELDS,
-                undefined,
-                undefined,
-                undefined
-            );
-            allWorkItems.push(...workItems);
+            for (let i = 0; i < ids.length; i += batchSize) {
+                const batch = ids.slice(i, i + batchSize);
+                console.log(`[AzureDevOpsService] Fetching batch ${Math.floor(i / batchSize) + 1}: ${batch.length} items`);
+
+                const workItems = await client.getWorkItems(
+                    batch,
+                    this.projectId,
+                    WORK_ITEM_FIELDS,
+                    undefined, // asOf
+                    undefined, // expand
+                    undefined  // errorPolicy
+                );
+
+                // Filter out null items (deleted/inaccessible)
+                const validItems = workItems.filter(wi => wi !== null);
+                allWorkItems.push(...validItems);
+            }
+
+            console.log(`[AzureDevOpsService] Retrieved ${allWorkItems.length} work items`);
+            return allWorkItems;
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error fetching work items:', error);
+            throw new Error(`Failed to fetch work items: ${error instanceof Error ? error.message : String(error)}`);
         }
-
-        return allWorkItems;
     }
 
     /**
@@ -190,24 +267,30 @@ class AzureDevOpsService {
             return [];
         }
 
-        const client = this.getWitClient();
-        const batchSize = 200;
-        const allWorkItems: WorkItem[] = [];
+        try {
+            const client = this.getWitClient();
+            const batchSize = 200;
+            const allWorkItems: WorkItem[] = [];
 
-        for (let i = 0; i < ids.length; i += batchSize) {
-            const batch = ids.slice(i, i + batchSize);
-            const workItems = await client.getWorkItems(
-                batch,
-                this.projectId,
-                WORK_ITEM_FIELDS,
-                undefined,
-                4, // WorkItemExpand.Relations
-                undefined
-            );
-            allWorkItems.push(...workItems);
+            for (let i = 0; i < ids.length; i += batchSize) {
+                const batch = ids.slice(i, i + batchSize);
+                const workItems = await client.getWorkItems(
+                    batch,
+                    this.projectId,
+                    WORK_ITEM_FIELDS,
+                    undefined,
+                    4, // WorkItemExpand.Relations
+                    undefined
+                );
+                const validItems = workItems.filter(wi => wi !== null);
+                allWorkItems.push(...validItems);
+            }
+
+            return allWorkItems;
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error fetching work items with relations:', error);
+            throw error;
         }
-
-        return allWorkItems;
     }
 
     /**
@@ -220,11 +303,19 @@ class AzureDevOpsService {
             throw new Error('Project not found');
         }
 
-        const client = this.getWitClient();
-        return await client.queryByWiql(
-            { query: wiql },
-            this.projectId
-        );
+        try {
+            console.log('[AzureDevOpsService] Executing WIQL query...');
+            const client = this.getWitClient();
+            const result = await client.queryByWiql(
+                { query: wiql },
+                this.projectId
+            );
+            console.log(`[AzureDevOpsService] WIQL returned ${result.workItemRelations?.length || result.workItems?.length || 0} items`);
+            return result;
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error executing WIQL:', error);
+            throw error;
+        }
     }
 
     /**
@@ -237,32 +328,32 @@ class AzureDevOpsService {
             throw new Error('Project not found');
         }
 
-        // Query for all hierarchical work items
+        // Query for all hierarchical work items - use simpler query first
         const wiql = `
-            SELECT [System.Id]
-            FROM WorkItemLinks
-            WHERE ([Source].[System.TeamProject] = @project
-                AND [Source].[System.WorkItemType] IN ('Epic', 'Feature', 'Product Backlog Item', 'Task', 'Bug')
-                AND [Source].[System.State] <> 'Removed')
-                AND ([Target].[System.TeamProject] = @project
-                AND [Target].[System.WorkItemType] IN ('Epic', 'Feature', 'Product Backlog Item', 'Task', 'Bug')
-                AND [Target].[System.State] <> 'Removed')
-                AND [System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward'
-            MODE (Recursive)
+            SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State]
+            FROM WorkItems
+            WHERE [System.TeamProject] = @project
+                AND [System.WorkItemType] IN ('Epic', 'Feature', 'Product Backlog Item', 'User Story', 'Task', 'Bug')
+                AND [System.State] <> 'Removed'
+            ORDER BY [System.WorkItemType], [System.Id]
         `;
 
-        const result = await this.executeWiql(wiql);
+        try {
+            console.log('[AzureDevOpsService] Fetching all hierarchical work items...');
+            const result = await this.executeWiql(wiql);
 
-        if (result.workItemRelations) {
-            const ids = new Set<number>();
-            for (const relation of result.workItemRelations) {
-                if (relation.source?.id) ids.add(relation.source.id);
-                if (relation.target?.id) ids.add(relation.target.id);
+            if (result.workItems && result.workItems.length > 0) {
+                const ids = result.workItems.map(wi => wi.id);
+                console.log(`[AzureDevOpsService] Found ${ids.length} work items to fetch`);
+                return await this.getWorkItems(ids);
             }
-            return await this.getWorkItems(Array.from(ids));
-        }
 
-        return [];
+            console.log('[AzureDevOpsService] No work items found');
+            return [];
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error in getHierarchicalWorkItems:', error);
+            throw error;
+        }
     }
 }
 

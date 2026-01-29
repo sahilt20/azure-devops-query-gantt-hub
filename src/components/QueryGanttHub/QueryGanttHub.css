@@ -163,6 +163,23 @@
 }
 
 /* Error Message */
+.hub-debug {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    margin: 0 24px 16px 24px;
+    font-size: 13px;
+}
+
+.debug-icon {
+    font-size: 14px;
+}
+
 .hub-error {
     display: flex;
     align-items: center;
