@@ -155,14 +155,32 @@ class AzureDevOpsService {
             console.log('[AzureDevOpsService] Fetching all queries...');
             const client = this.getWitClient();
 
-            // Use getQueries with depth 1 first, then expand what we find
-            const queries = await client.getQueries(this.projectId, QueryExpand.All, 2);
-            console.log(`[AzureDevOpsService] Got ${queries.length} top-level items`);
+            // Use QueryExpand.None with depth 1 first - this is faster
+            console.log('[AzureDevOpsService] Calling getQueries API...');
+            const queries = await client.getQueries(this.projectId, QueryExpand.None, 1);
+            console.log(`[AzureDevOpsService] Got ${queries.length} top-level items:`, queries.map(q => q.name));
 
-            const flattenedQueries = this.flattenQueries(queries);
-            console.log(`[AzureDevOpsService] Flattened to ${flattenedQueries.length} queries`);
+            // Expand each folder manually
+            const allQueries: IQueryInfo[] = [];
 
-            return flattenedQueries;
+            for (const folder of queries) {
+                if (folder.isFolder && folder.id) {
+                    try {
+                        console.log(`[AzureDevOpsService] Expanding folder: ${folder.name}`);
+                        const expanded = await client.getQuery(this.projectId, folder.id, QueryExpand.All, 2);
+                        if (expanded && expanded.children) {
+                            const flattened = this.flattenQueries(expanded.children, folder.name || '');
+                            allQueries.push(...flattened);
+                            console.log(`[AzureDevOpsService] Found ${flattened.length} queries in ${folder.name}`);
+                        }
+                    } catch (err) {
+                        console.warn(`[AzureDevOpsService] Could not expand folder ${folder.name}:`, err);
+                    }
+                }
+            }
+
+            console.log(`[AzureDevOpsService] Total queries found: ${allQueries.length}`);
+            return allQueries;
         } catch (error) {
             console.error('[AzureDevOpsService] Error fetching queries:', error);
             // Return empty array instead of throwing so users can still use Load All Work Items
