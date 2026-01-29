@@ -11,7 +11,7 @@ import {
     WorkItemQueryResult,
     QueryExpand
 } from 'azure-devops-extension-api/WorkItemTracking';
-import { getClient, IProjectPageService, CommonServiceIds, IHostPageLayoutService } from 'azure-devops-extension-api';
+import { getClient, IProjectPageService, CommonServiceIds } from 'azure-devops-extension-api';
 import { IQueryInfo } from '../models/WorkItemModels';
 
 /**
@@ -37,12 +37,25 @@ const WORK_ITEM_FIELDS = [
     'Microsoft.VSTS.Common.ClosedDate'
 ];
 
+/**
+ * Promise with timeout
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+        )
+    ]);
+}
+
 class AzureDevOpsService {
     private static instance: AzureDevOpsService;
     private projectId: string | null = null;
     private projectName: string | null = null;
     private initialized = false;
     private initError: string | null = null;
+    private initPromise: Promise<void> | null = null;
 
     private constructor() { }
 
@@ -59,36 +72,75 @@ class AzureDevOpsService {
     public async initialize(): Promise<void> {
         if (this.initialized) return;
 
+        // Prevent multiple simultaneous initialization attempts
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+
+        this.initPromise = this.doInitialize();
+        return this.initPromise;
+    }
+
+    private async doInitialize(): Promise<void> {
         try {
-            console.log('[AzureDevOpsService] Initializing SDK...');
-            await SDK.init();
-            console.log('[AzureDevOpsService] SDK initialized, waiting for ready...');
-            await SDK.ready();
-            console.log('[AzureDevOpsService] SDK ready');
+            console.log('[AzureDevOpsService] Starting SDK initialization...');
 
-            const projectService = await SDK.getService<IProjectPageService>(
-                CommonServiceIds.ProjectPageService
+            // SDK.init() with timeout
+            await withTimeout(
+                SDK.init(),
+                10000,
+                'SDK.init() timed out after 10 seconds'
             );
-            console.log('[AzureDevOpsService] Got project service');
+            console.log('[AzureDevOpsService] SDK.init() complete');
 
-            const project = await projectService.getProject();
-            console.log('[AzureDevOpsService] Project:', project);
+            // SDK.ready() with timeout
+            await withTimeout(
+                SDK.ready(),
+                10000,
+                'SDK.ready() timed out after 10 seconds'
+            );
+            console.log('[AzureDevOpsService] SDK.ready() complete');
+
+            // Get project service with timeout
+            const projectService = await withTimeout(
+                SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService),
+                5000,
+                'Failed to get ProjectPageService'
+            );
+            console.log('[AzureDevOpsService] Got ProjectPageService');
+
+            // Get project with timeout
+            const project = await withTimeout(
+                projectService.getProject(),
+                5000,
+                'Failed to get project context'
+            );
+            console.log('[AzureDevOpsService] Project result:', project);
 
             if (project) {
                 this.projectId = project.id;
                 this.projectName = project.name;
-                console.log(`[AzureDevOpsService] Project ID: ${this.projectId}, Name: ${this.projectName}`);
+                console.log(`[AzureDevOpsService] Connected to project: ${this.projectName} (${this.projectId})`);
             } else {
-                this.initError = 'Could not get project context. Make sure the extension is loaded within an Azure DevOps project.';
-                console.error('[AzureDevOpsService] No project found');
+                this.initError = 'No project context found. Make sure you are viewing this extension within an Azure DevOps project.';
+                console.warn('[AzureDevOpsService] No project found in context');
             }
 
             this.initialized = true;
         } catch (error) {
-            this.initError = `SDK initialization failed: ${error instanceof Error ? error.message : String(error)}`;
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this.initError = `SDK initialization failed: ${errorMsg}`;
             console.error('[AzureDevOpsService] Initialization error:', error);
+            this.initialized = true; // Mark as initialized to prevent retries
             throw error;
         }
+    }
+
+    /**
+     * Check if SDK is initialized
+     */
+    public isInitialized(): boolean {
+        return this.initialized;
     }
 
     /**
@@ -126,16 +178,22 @@ class AzureDevOpsService {
         await this.initialize();
 
         if (!this.projectId) {
-            console.error('[AzureDevOpsService] Cannot get queries - no project ID');
-            throw new Error('Project not found. ' + (this.initError || ''));
+            const errorMsg = this.initError || 'Project not found';
+            console.error('[AzureDevOpsService] Cannot get queries:', errorMsg);
+            throw new Error(errorMsg);
         }
 
         try {
-            console.log(`[AzureDevOpsService] Fetching queries with depth ${depth}...`);
+            console.log(`[AzureDevOpsService] Fetching queries for project ${this.projectName} with depth ${depth}...`);
             const client = this.getWitClient();
 
-            // Get both "Shared Queries" and "My Queries" folders
-            const queries = await client.getQueries(this.projectId, QueryExpand.All, depth);
+            // Get queries with timeout
+            const queries = await withTimeout(
+                client.getQueries(this.projectId, QueryExpand.All, depth),
+                30000,
+                'Query fetch timed out after 30 seconds'
+            );
+
             console.log(`[AzureDevOpsService] Got ${queries.length} top-level query folders`);
 
             const flattenedQueries = this.flattenQueries(queries);
@@ -155,6 +213,8 @@ class AzureDevOpsService {
         const result: IQueryInfo[] = [];
 
         for (const query of queries) {
+            if (!query) continue;
+
             const currentPath = path ? `${path}/${query.name}` : query.name || 'Unknown';
 
             if (!query.isFolder && query.id) {
@@ -199,7 +259,12 @@ class AzureDevOpsService {
         try {
             console.log(`[AzureDevOpsService] Executing query: ${queryId}`);
             const client = this.getWitClient();
-            const result = await client.queryById(queryId, this.projectId);
+
+            const result = await withTimeout(
+                client.queryById(queryId, this.projectId),
+                30000,
+                'Query execution timed out'
+            );
 
             const itemCount = result.workItems?.length || 0;
             const relationCount = result.workItemRelations?.length || 0;
@@ -235,13 +300,17 @@ class AzureDevOpsService {
                 const batch = ids.slice(i, i + batchSize);
                 console.log(`[AzureDevOpsService] Fetching batch ${Math.floor(i / batchSize) + 1}: ${batch.length} items`);
 
-                const workItems = await client.getWorkItems(
-                    batch,
-                    this.projectId,
-                    WORK_ITEM_FIELDS,
-                    undefined, // asOf
-                    undefined, // expand
-                    undefined  // errorPolicy
+                const workItems = await withTimeout(
+                    client.getWorkItems(
+                        batch,
+                        this.projectId,
+                        WORK_ITEM_FIELDS,
+                        undefined, // asOf
+                        undefined, // expand
+                        undefined  // errorPolicy
+                    ),
+                    30000,
+                    'Work item fetch timed out'
                 );
 
                 // Filter out null items (deleted/inaccessible)
@@ -306,9 +375,10 @@ class AzureDevOpsService {
         try {
             console.log('[AzureDevOpsService] Executing WIQL query...');
             const client = this.getWitClient();
-            const result = await client.queryByWiql(
-                { query: wiql },
-                this.projectId
+            const result = await withTimeout(
+                client.queryByWiql({ query: wiql }, this.projectId),
+                30000,
+                'WIQL query timed out'
             );
             console.log(`[AzureDevOpsService] WIQL returned ${result.workItemRelations?.length || result.workItems?.length || 0} items`);
             return result;
