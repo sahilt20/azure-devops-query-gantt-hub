@@ -5,13 +5,11 @@
 
 import * as SDK from 'azure-devops-extension-sdk';
 import {
-    WorkItemTrackingRestClient,
-    WorkItem,
     QueryHierarchyItem,
-    WorkItemQueryResult,
-    QueryExpand
+    WorkItem,
+    WorkItemQueryResult
 } from 'azure-devops-extension-api/WorkItemTracking';
-import { getClient, IProjectPageService, CommonServiceIds } from 'azure-devops-extension-api';
+import { IProjectPageService, CommonServiceIds } from 'azure-devops-extension-api';
 import { IQueryInfo } from '../models/WorkItemModels';
 
 /**
@@ -41,6 +39,8 @@ class AzureDevOpsService {
     private static instance: AzureDevOpsService;
     private projectId: string | null = null;
     private projectName: string | null = null;
+    private organization: string | null = null;
+    private baseUrl: string | null = null;
     private initialized = false;
     private initError: string | null = null;
     private initPromise: Promise<void> | null = null;
@@ -60,7 +60,6 @@ class AzureDevOpsService {
     public async initialize(): Promise<void> {
         if (this.initialized) return;
 
-        // Prevent multiple simultaneous initialization attempts
         if (this.initPromise) {
             return this.initPromise;
         }
@@ -79,6 +78,11 @@ class AzureDevOpsService {
             await SDK.ready();
             console.log('[AzureDevOpsService] SDK.ready() complete');
 
+            // Get host (organization)
+            const host = SDK.getHost();
+            this.organization = host.name;
+            console.log(`[AzureDevOpsService] Host: ${host.name} (${host.id})`);
+
             const projectService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
             console.log('[AzureDevOpsService] Got ProjectPageService');
 
@@ -88,7 +92,10 @@ class AzureDevOpsService {
             if (project) {
                 this.projectId = project.id;
                 this.projectName = project.name;
+                // Construct base URL: https://dev.azure.com/{org}/{project}/_apis
+                this.baseUrl = `https://dev.azure.com/${this.organization}/${this.projectId}/_apis`;
                 console.log(`[AzureDevOpsService] Connected to project: ${this.projectName} (${this.projectId})`);
+                console.log(`[AzureDevOpsService] API Base URL: ${this.baseUrl}`);
             } else {
                 this.initError = 'No project context found. Make sure you are viewing this extension within an Azure DevOps project.';
                 console.warn('[AzureDevOpsService] No project found in context');
@@ -110,6 +117,32 @@ class AzureDevOpsService {
     }
 
     /**
+     * Helper to make authenticated API requests using fetch
+     */
+    private async makeApiRequest<T>(url: string, method: string = 'GET', body?: any): Promise<T> {
+        const token = await SDK.getAccessToken();
+        if (!token) throw new Error('No access token available');
+
+        const headers: HeadersInit = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+
+        const response = await fetch(url, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`API Error ${response.status}: ${response.statusText} - ${text}`);
+        }
+
+        return response.json();
+    }
+
+    /**
      * Check if SDK is initialized
      */
     public isInitialized(): boolean {
@@ -121,13 +154,6 @@ class AzureDevOpsService {
      */
     public getInitError(): string | null {
         return this.initError;
-    }
-
-    /**
-     * Get the Work Item Tracking REST client
-     */
-    private getWitClient(): WorkItemTrackingRestClient {
-        return getClient(WorkItemTrackingRestClient);
     }
 
     /**
@@ -145,50 +171,28 @@ class AzureDevOpsService {
     }
 
     /**
-     * Get all queries in the project - simplified approach
+     * Get all queries in the project using REST API
      */
     public async getQueries(): Promise<IQueryInfo[]> {
         await this.initialize();
-
-        if (!this.projectId) {
-            const errorMsg = this.initError || 'Project not found';
-            console.error('[AzureDevOpsService] Cannot get queries:', errorMsg);
-            throw new Error(errorMsg);
+        if (!this.baseUrl) {
+            console.error('[AzureDevOpsService] Cannot get queries: No base URL');
+            return [];
         }
 
         try {
-            console.log('[AzureDevOpsService] Fetching all queries...');
-            const client = this.getWitClient();
+            console.log('[AzureDevOpsService] Fetching queries via REST...');
+            // Get root folders with depth 2 to see Shared/My Queries and their children
+            const url = `${this.baseUrl}/wit/queries?api-version=7.0&$depth=2&$expand=all`;
 
-            // Use QueryExpand.None with depth 1 first - this is faster
-            console.log('[AzureDevOpsService] Calling getQueries API...');
-            const queries = await client.getQueries(this.projectId, QueryExpand.None, 1);
-            console.log(`[AzureDevOpsService] Got ${queries.length} top-level items:`, queries.map(q => q.name));
+            console.log(`[AzureDevOpsService] GET ${url}`);
+            const result = await this.makeApiRequest<{ value: QueryHierarchyItem[] }>(url);
 
-            // Expand each folder manually
-            const allQueries: IQueryInfo[] = [];
-
-            for (const folder of queries) {
-                if (folder.isFolder && folder.id) {
-                    try {
-                        console.log(`[AzureDevOpsService] Expanding folder: ${folder.name}`);
-                        const expanded = await client.getQuery(this.projectId, folder.id, QueryExpand.All, 2);
-                        if (expanded && expanded.children) {
-                            const flattened = this.flattenQueries(expanded.children, folder.name || '');
-                            allQueries.push(...flattened);
-                            console.log(`[AzureDevOpsService] Found ${flattened.length} queries in ${folder.name}`);
-                        }
-                    } catch (err) {
-                        console.warn(`[AzureDevOpsService] Could not expand folder ${folder.name}:`, err);
-                    }
-                }
-            }
-
-            console.log(`[AzureDevOpsService] Total queries found: ${allQueries.length}`);
-            return allQueries;
+            console.log(`[AzureDevOpsService] Got ${result.value?.length || 0} root items`);
+            const flattened = this.flattenQueries(result.value || []);
+            return flattened;
         } catch (error) {
             console.error('[AzureDevOpsService] Error fetching queries:', error);
-            // Return empty array instead of throwing so users can still use Load All Work Items
             return [];
         }
     }
@@ -235,21 +239,18 @@ class AzureDevOpsService {
     }
 
     /**
-     * Execute a query and return work item IDs
+     * Execute query using REST API (via WIQL endpoint)
      */
     public async executeQuery(queryId: string): Promise<WorkItemQueryResult> {
         await this.initialize();
-
-        if (!this.projectId) {
-            throw new Error('Project not found');
-        }
+        if (!this.baseUrl) throw new Error('No project context');
 
         try {
-            console.log(`[AzureDevOpsService] Executing query: ${queryId}`);
-            const client = this.getWitClient();
+            console.log(`[AzureDevOpsService] Executing Query ${queryId} via REST...`);
+            // To execute a stored query, we actually use the GET /wit/wiql/{id} endpoint
+            const url = `${this.baseUrl}/wit/wiql/${queryId}?api-version=7.0`;
 
-            const result = await client.queryById(queryId, this.projectId);
-
+            const result = await this.makeApiRequest<WorkItemQueryResult>(url);
             const itemCount = result.workItems?.length || 0;
             const relationCount = result.workItemRelations?.length || 0;
             console.log(`[AzureDevOpsService] Query returned ${itemCount} items, ${relationCount} relations`);
@@ -262,21 +263,39 @@ class AzureDevOpsService {
     }
 
     /**
-     * Get work items by IDs with all required fields
+     * Execute a WIQL query using REST API
+     */
+    public async executeWiql(wiql: string): Promise<WorkItemQueryResult> {
+        await this.initialize();
+        if (!this.baseUrl) throw new Error('No project context');
+
+        try {
+            console.log('[AzureDevOpsService] Executing WIQL via REST...');
+            const url = `${this.baseUrl}/wit/wiql?api-version=7.0`;
+            const result = await this.makeApiRequest<WorkItemQueryResult>(url, 'POST', { query: wiql });
+            console.log(`[AzureDevOpsService] WIQL result: ${result.workItems?.length || result.workItemRelations?.length || 0} items`);
+            return result;
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error executing WIQL:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get work items by IDs using REST API batch
      */
     public async getWorkItems(ids: number[]): Promise<WorkItem[]> {
         await this.initialize();
 
-        if (!this.projectId || ids.length === 0) {
+        if (!this.baseUrl || ids.length === 0) {
             console.log('[AzureDevOpsService] getWorkItems: no project or empty ids');
             return [];
         }
 
         try {
             console.log(`[AzureDevOpsService] Fetching ${ids.length} work items...`);
-            const client = this.getWitClient();
+            const url = `${this.baseUrl}/wit/workitemsbatch?api-version=7.0`;
 
-            // Azure DevOps API limits to 200 work items per request
             const batchSize = 200;
             const allWorkItems: WorkItem[] = [];
 
@@ -284,18 +303,17 @@ class AzureDevOpsService {
                 const batch = ids.slice(i, i + batchSize);
                 console.log(`[AzureDevOpsService] Fetching batch ${Math.floor(i / batchSize) + 1}: ${batch.length} items`);
 
-                const workItems = await client.getWorkItems(
-                    batch,
-                    this.projectId,
-                    WORK_ITEM_FIELDS,
-                    undefined,
-                    undefined,
-                    undefined
-                );
+                const body = {
+                    ids: batch,
+                    fields: WORK_ITEM_FIELDS
+                };
 
-                // Filter out null items
-                const validItems = workItems.filter(wi => wi !== null);
-                allWorkItems.push(...validItems);
+                const result = await this.makeApiRequest<{ value: WorkItem[] }>(url, 'POST', body);
+
+                if (result.value) {
+                    const validItems = result.value.filter(wi => wi !== null);
+                    allWorkItems.push(...validItems);
+                }
             }
 
             console.log(`[AzureDevOpsService] Retrieved ${allWorkItems.length} work items`);
@@ -307,34 +325,12 @@ class AzureDevOpsService {
     }
 
     /**
-     * Execute a WIQL query directly
-     */
-    public async executeWiql(wiql: string): Promise<WorkItemQueryResult> {
-        await this.initialize();
-
-        if (!this.projectId) {
-            throw new Error('Project not found');
-        }
-
-        try {
-            console.log('[AzureDevOpsService] Executing WIQL query...');
-            const client = this.getWitClient();
-            const result = await client.queryByWiql({ query: wiql }, this.projectId);
-            console.log(`[AzureDevOpsService] WIQL returned ${result.workItemRelations?.length || result.workItems?.length || 0} items`);
-            return result;
-        } catch (error) {
-            console.error('[AzureDevOpsService] Error executing WIQL:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Get all work items in hierarchy (Epic -> Feature -> PBI -> Task)
+     * Get all hierarchical work items using REST API
      */
     public async getHierarchicalWorkItems(): Promise<WorkItem[]> {
         await this.initialize();
 
-        if (!this.projectId) {
+        if (!this.baseUrl) {
             throw new Error('Project not found');
         }
 
