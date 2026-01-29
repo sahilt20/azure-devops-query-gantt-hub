@@ -57,5 +57,5 @@ module.exports = {
         },
         server: 'https'
     },
-    devtool: 'source-map'
+    devtool: false
 };
