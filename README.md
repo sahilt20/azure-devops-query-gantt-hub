@@ -143,6 +143,24 @@ azure-devops-query-ui-hub/
 └── webpack.config.js
 ```
 
+
+## Troubleshooting & Known Issues
+
+### "Content Security Policy" blocks 'eval'
+If you see an error about `unsafe-eval` in the console:
+- This is caused by webpack source maps.
+- **Fix**: Build with `devtool: false` (already configured in v1.0.6+).
+
+### Authentication Hanging
+If the extension hangs on "Loading...":
+- Check the console for `[AzureDevOpsService]` logs.
+- Ensure your network allows access to `dev.azure.com`.
+- The extension now uses native `fetch()` calls to bypass potential SDK client library issues.
+
+### "No project context" Error
+- Ensure you are viewing the hub within an active Azure DevOps project.
+- The extension URL should look like: `https://dev.azure.com/{org}/{project}/_apps/hub/...`
+
 ## License
 
 MIT
