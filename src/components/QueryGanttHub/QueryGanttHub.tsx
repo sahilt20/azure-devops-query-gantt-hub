@@ -55,7 +55,7 @@ export const QueryGanttHub: React.FC = () => {
                 }
 
                 setDebugInfo('Loading queries...');
-                const loadedQueries = await azureDevOpsService.getQueries(5);
+                const loadedQueries = await azureDevOpsService.getQueries();
                 setQueries(loadedQueries);
                 setDebugInfo(`Loaded ${loadedQueries.length} queries from ${project}`);
             } catch (err) {

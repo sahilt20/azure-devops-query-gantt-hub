@@ -37,18 +37,6 @@ const WORK_ITEM_FIELDS = [
     'Microsoft.VSTS.Common.ClosedDate'
 ];
 
-/**
- * Promise with timeout
- */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
-    return Promise.race([
-        promise,
-        new Promise<T>((_, reject) =>
-            setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
-        )
-    ]);
-}
-
 class AzureDevOpsService {
     private static instance: AzureDevOpsService;
     private projectId: string | null = null;
@@ -85,36 +73,16 @@ class AzureDevOpsService {
         try {
             console.log('[AzureDevOpsService] Starting SDK initialization...');
 
-            // SDK.init() with timeout
-            await withTimeout(
-                SDK.init(),
-                10000,
-                'SDK.init() timed out after 10 seconds'
-            );
+            await SDK.init();
             console.log('[AzureDevOpsService] SDK.init() complete');
 
-            // SDK.ready() with timeout
-            await withTimeout(
-                SDK.ready(),
-                10000,
-                'SDK.ready() timed out after 10 seconds'
-            );
+            await SDK.ready();
             console.log('[AzureDevOpsService] SDK.ready() complete');
 
-            // Get project service with timeout
-            const projectService = await withTimeout(
-                SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService),
-                5000,
-                'Failed to get ProjectPageService'
-            );
+            const projectService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
             console.log('[AzureDevOpsService] Got ProjectPageService');
 
-            // Get project with timeout
-            const project = await withTimeout(
-                projectService.getProject(),
-                5000,
-                'Failed to get project context'
-            );
+            const project = await projectService.getProject();
             console.log('[AzureDevOpsService] Project result:', project);
 
             if (project) {
@@ -131,7 +99,7 @@ class AzureDevOpsService {
             const errorMsg = error instanceof Error ? error.message : String(error);
             this.initError = `SDK initialization failed: ${errorMsg}`;
             console.error('[AzureDevOpsService] Initialization error:', error);
-            this.initialized = true; // Mark as initialized to prevent retries
+            this.initialized = true;
             throw error;
         }
     }
@@ -172,9 +140,9 @@ class AzureDevOpsService {
     }
 
     /**
-     * Get all queries in the project
+     * Get all queries in the project - simplified approach
      */
-    public async getQueries(depth: number = 2): Promise<IQueryInfo[]> {
+    public async getQueries(): Promise<IQueryInfo[]> {
         await this.initialize();
 
         if (!this.projectId) {
@@ -183,45 +151,23 @@ class AzureDevOpsService {
             throw new Error(errorMsg);
         }
 
-        const client = this.getWitClient();
-        const allQueries: IQueryInfo[] = [];
-
-        // Try to get Shared Queries folder
         try {
-            console.log('[AzureDevOpsService] Fetching Shared Queries...');
-            const sharedQueries = await withTimeout(
-                client.getQuery(this.projectId, 'Shared Queries', QueryExpand.All, depth),
-                15000,
-                'Shared Queries fetch timed out'
-            );
-            if (sharedQueries && sharedQueries.children) {
-                const flattenedShared = this.flattenQueries(sharedQueries.children, 'Shared Queries');
-                console.log(`[AzureDevOpsService] Found ${flattenedShared.length} shared queries`);
-                allQueries.push(...flattenedShared);
-            }
-        } catch (err) {
-            console.warn('[AzureDevOpsService] Could not fetch Shared Queries:', err);
-        }
+            console.log('[AzureDevOpsService] Fetching all queries...');
+            const client = this.getWitClient();
 
-        // Try to get My Queries folder
-        try {
-            console.log('[AzureDevOpsService] Fetching My Queries...');
-            const myQueries = await withTimeout(
-                client.getQuery(this.projectId, 'My Queries', QueryExpand.All, depth),
-                15000,
-                'My Queries fetch timed out'
-            );
-            if (myQueries && myQueries.children) {
-                const flattenedMy = this.flattenQueries(myQueries.children, 'My Queries');
-                console.log(`[AzureDevOpsService] Found ${flattenedMy.length} personal queries`);
-                allQueries.push(...flattenedMy);
-            }
-        } catch (err) {
-            console.warn('[AzureDevOpsService] Could not fetch My Queries:', err);
-        }
+            // Use getQueries with depth 1 first, then expand what we find
+            const queries = await client.getQueries(this.projectId, QueryExpand.All, 2);
+            console.log(`[AzureDevOpsService] Got ${queries.length} top-level items`);
 
-        console.log(`[AzureDevOpsService] Total queries found: ${allQueries.length}`);
-        return allQueries;
+            const flattenedQueries = this.flattenQueries(queries);
+            console.log(`[AzureDevOpsService] Flattened to ${flattenedQueries.length} queries`);
+
+            return flattenedQueries;
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error fetching queries:', error);
+            // Return empty array instead of throwing so users can still use Load All Work Items
+            return [];
+        }
     }
 
     /**
@@ -235,8 +181,8 @@ class AzureDevOpsService {
 
             const currentPath = path ? `${path}/${query.name}` : query.name || 'Unknown';
 
+            // Add non-folder queries
             if (!query.isFolder && query.id) {
-                // Determine query type from queryType enum
                 let queryType: 'flat' | 'oneHop' | 'tree' = 'flat';
                 if (query.queryType !== undefined) {
                     switch (query.queryType) {
@@ -256,6 +202,7 @@ class AzureDevOpsService {
                 });
             }
 
+            // Recursively process children
             if (query.children && query.children.length > 0) {
                 result.push(...this.flattenQueries(query.children, currentPath));
             }
@@ -278,11 +225,7 @@ class AzureDevOpsService {
             console.log(`[AzureDevOpsService] Executing query: ${queryId}`);
             const client = this.getWitClient();
 
-            const result = await withTimeout(
-                client.queryById(queryId, this.projectId),
-                30000,
-                'Query execution timed out'
-            );
+            const result = await client.queryById(queryId, this.projectId);
 
             const itemCount = result.workItems?.length || 0;
             const relationCount = result.workItemRelations?.length || 0;
@@ -318,20 +261,16 @@ class AzureDevOpsService {
                 const batch = ids.slice(i, i + batchSize);
                 console.log(`[AzureDevOpsService] Fetching batch ${Math.floor(i / batchSize) + 1}: ${batch.length} items`);
 
-                const workItems = await withTimeout(
-                    client.getWorkItems(
-                        batch,
-                        this.projectId,
-                        WORK_ITEM_FIELDS,
-                        undefined, // asOf
-                        undefined, // expand
-                        undefined  // errorPolicy
-                    ),
-                    30000,
-                    'Work item fetch timed out'
+                const workItems = await client.getWorkItems(
+                    batch,
+                    this.projectId,
+                    WORK_ITEM_FIELDS,
+                    undefined,
+                    undefined,
+                    undefined
                 );
 
-                // Filter out null items (deleted/inaccessible)
+                // Filter out null items
                 const validItems = workItems.filter(wi => wi !== null);
                 allWorkItems.push(...validItems);
             }
@@ -341,42 +280,6 @@ class AzureDevOpsService {
         } catch (error) {
             console.error('[AzureDevOpsService] Error fetching work items:', error);
             throw new Error(`Failed to fetch work items: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
-
-    /**
-     * Get work items with their relations/links
-     */
-    public async getWorkItemsWithRelations(ids: number[]): Promise<WorkItem[]> {
-        await this.initialize();
-
-        if (!this.projectId || ids.length === 0) {
-            return [];
-        }
-
-        try {
-            const client = this.getWitClient();
-            const batchSize = 200;
-            const allWorkItems: WorkItem[] = [];
-
-            for (let i = 0; i < ids.length; i += batchSize) {
-                const batch = ids.slice(i, i + batchSize);
-                const workItems = await client.getWorkItems(
-                    batch,
-                    this.projectId,
-                    WORK_ITEM_FIELDS,
-                    undefined,
-                    4, // WorkItemExpand.Relations
-                    undefined
-                );
-                const validItems = workItems.filter(wi => wi !== null);
-                allWorkItems.push(...validItems);
-            }
-
-            return allWorkItems;
-        } catch (error) {
-            console.error('[AzureDevOpsService] Error fetching work items with relations:', error);
-            throw error;
         }
     }
 
@@ -393,11 +296,7 @@ class AzureDevOpsService {
         try {
             console.log('[AzureDevOpsService] Executing WIQL query...');
             const client = this.getWitClient();
-            const result = await withTimeout(
-                client.queryByWiql({ query: wiql }, this.projectId),
-                30000,
-                'WIQL query timed out'
-            );
+            const result = await client.queryByWiql({ query: wiql }, this.projectId);
             console.log(`[AzureDevOpsService] WIQL returned ${result.workItemRelations?.length || result.workItems?.length || 0} items`);
             return result;
         } catch (error) {
@@ -416,7 +315,6 @@ class AzureDevOpsService {
             throw new Error('Project not found');
         }
 
-        // Query for all hierarchical work items - use simpler query first
         const wiql = `
             SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State]
             FROM WorkItems
