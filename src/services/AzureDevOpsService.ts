@@ -174,7 +174,7 @@ class AzureDevOpsService {
     /**
      * Get all queries in the project
      */
-    public async getQueries(depth: number = 5): Promise<IQueryInfo[]> {
+    public async getQueries(depth: number = 2): Promise<IQueryInfo[]> {
         await this.initialize();
 
         if (!this.projectId) {
@@ -183,27 +183,45 @@ class AzureDevOpsService {
             throw new Error(errorMsg);
         }
 
+        const client = this.getWitClient();
+        const allQueries: IQueryInfo[] = [];
+
+        // Try to get Shared Queries folder
         try {
-            console.log(`[AzureDevOpsService] Fetching queries for project ${this.projectName} with depth ${depth}...`);
-            const client = this.getWitClient();
-
-            // Get queries with timeout
-            const queries = await withTimeout(
-                client.getQueries(this.projectId, QueryExpand.All, depth),
-                30000,
-                'Query fetch timed out after 30 seconds'
+            console.log('[AzureDevOpsService] Fetching Shared Queries...');
+            const sharedQueries = await withTimeout(
+                client.getQuery(this.projectId, 'Shared Queries', QueryExpand.All, depth),
+                15000,
+                'Shared Queries fetch timed out'
             );
-
-            console.log(`[AzureDevOpsService] Got ${queries.length} top-level query folders`);
-
-            const flattenedQueries = this.flattenQueries(queries);
-            console.log(`[AzureDevOpsService] Flattened to ${flattenedQueries.length} queries`);
-
-            return flattenedQueries;
-        } catch (error) {
-            console.error('[AzureDevOpsService] Error fetching queries:', error);
-            throw new Error(`Failed to fetch queries: ${error instanceof Error ? error.message : String(error)}`);
+            if (sharedQueries && sharedQueries.children) {
+                const flattenedShared = this.flattenQueries(sharedQueries.children, 'Shared Queries');
+                console.log(`[AzureDevOpsService] Found ${flattenedShared.length} shared queries`);
+                allQueries.push(...flattenedShared);
+            }
+        } catch (err) {
+            console.warn('[AzureDevOpsService] Could not fetch Shared Queries:', err);
         }
+
+        // Try to get My Queries folder
+        try {
+            console.log('[AzureDevOpsService] Fetching My Queries...');
+            const myQueries = await withTimeout(
+                client.getQuery(this.projectId, 'My Queries', QueryExpand.All, depth),
+                15000,
+                'My Queries fetch timed out'
+            );
+            if (myQueries && myQueries.children) {
+                const flattenedMy = this.flattenQueries(myQueries.children, 'My Queries');
+                console.log(`[AzureDevOpsService] Found ${flattenedMy.length} personal queries`);
+                allQueries.push(...flattenedMy);
+            }
+        } catch (err) {
+            console.warn('[AzureDevOpsService] Could not fetch My Queries:', err);
+        }
+
+        console.log(`[AzureDevOpsService] Total queries found: ${allQueries.length}`);
+        return allQueries;
     }
 
     /**
