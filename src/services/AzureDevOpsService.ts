@@ -94,6 +94,11 @@ class AzureDevOpsService {
                 console.warn('[AzureDevOpsService] No project found in context');
             }
 
+            // Test Access Token acquisition
+            console.log('[AzureDevOpsService] Testing access token acquisition...');
+            const token = await SDK.getAccessToken();
+            console.log(`[AzureDevOpsService] Access token acquired: ${token ? 'Yes (Length: ' + token.length + ')' : 'No'}`);
+
             this.initialized = true;
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
