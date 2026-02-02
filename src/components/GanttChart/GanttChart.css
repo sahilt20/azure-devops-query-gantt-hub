@@ -184,6 +184,8 @@
 .gantt-table-body {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
 }
 
 /* Timeline Panel */
@@ -249,17 +251,28 @@
 /* Timeline Body */
 .gantt-timeline-body {
     flex: 1;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: scroll;
     position: relative;
+}
+
+/* Hide vertical scrollbar on timeline - table scrollbar is the primary one */
+.gantt-timeline-body::-webkit-scrollbar-y {
+    display: none;
+}
+
+/* For Firefox */
+.gantt-timeline-body {
+    scrollbar-width: thin;
 }
 
 .gantt-timeline-grid {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
+    height: 100%;
     pointer-events: none;
+    z-index: 1;
 }
 
 .gantt-timeline-grid-line {
@@ -433,6 +446,7 @@
     position: relative;
     border-bottom: 1px solid var(--gantt-border);
     box-sizing: border-box;
+    z-index: 2;
 }
 
 /* Gantt Bar */
