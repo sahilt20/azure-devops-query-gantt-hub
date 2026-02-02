@@ -279,8 +279,10 @@ class EffortRollupService {
             itemCount += this.countItems(node);
         }
 
+        // Calculate overall percent based on Remaining Work vs Effort
+        // This is more robust as many teams don't explicitly track "Completed Work" field
         const overallPercent = totalEffort > 0
-            ? Math.round((totalCompleted / totalEffort) * 100)
+            ? Math.round(100 - ((totalRemaining / totalEffort) * 100))
             : 0;
 
         return {
