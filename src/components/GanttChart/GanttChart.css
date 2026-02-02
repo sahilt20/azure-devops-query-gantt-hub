@@ -534,42 +534,93 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* Gantt Bar - Base is now lighter (Remaining Work) */
 .gantt-bar.epic {
-    background: linear-gradient(135deg, var(--color-epic) 0%, #dd6b20 100%);
+    background: rgba(237, 137, 54, 0.2);
+    border: 1px solid rgba(237, 137, 54, 0.4);
 }
 
 .gantt-bar.feature {
-    background: linear-gradient(135deg, var(--color-feature) 0%, #805ad5 100%);
+    background: rgba(159, 122, 234, 0.2);
+    border: 1px solid rgba(159, 122, 234, 0.4);
 }
 
 .gantt-bar.pbi {
-    background: linear-gradient(135deg, var(--color-pbi) 0%, #3182ce 100%);
+    background: rgba(66, 153, 225, 0.2);
+    border: 1px solid rgba(66, 153, 225, 0.4);
 }
 
 .gantt-bar.task {
-    background: linear-gradient(135deg, var(--color-task) 0%, #d69e2e 100%);
+    background: rgba(236, 201, 75, 0.2);
+    border: 1px solid rgba(236, 201, 75, 0.4);
 }
 
 .gantt-bar.bug {
-    background: linear-gradient(135deg, var(--color-bug) 0%, #c53030 100%);
+    background: rgba(245, 101, 101, 0.2);
+    border: 1px solid rgba(245, 101, 101, 0.4);
 }
 
 .gantt-bar.release {
-    background: linear-gradient(135deg, var(--color-release) 0%, #38a169 100%);
+    background: rgba(72, 187, 120, 0.2);
+    border: 1px solid rgba(72, 187, 120, 0.4);
 }
 
 .gantt-bar.unknown {
-    background: linear-gradient(135deg, var(--color-unknown) 0%, #4a5568 100%);
+    background: rgba(113, 128, 150, 0.2);
+    border: 1px solid rgba(113, 128, 150, 0.4);
 }
 
+/* Progress Fill - Darker + Pattern (Completed Work) */
 .gantt-bar-progress {
     position: absolute;
     top: 0;
     left: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 6px 0 0 6px;
+    border-radius: 5px 0 0 5px;
     transition: width 0.3s ease;
+    /* Striped Pattern */
+    background-image: repeating-linear-gradient(45deg,
+            rgba(255, 255, 255, 0.15) 0px,
+            rgba(255, 255, 255, 0.15) 10px,
+            transparent 10px,
+            transparent 20px);
+    background-size: 28px 28px;
+}
+
+/* Specific Progress Colors */
+.gantt-bar.epic .gantt-bar-progress {
+    background-color: var(--color-epic);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-bar.feature .gantt-bar-progress {
+    background-color: var(--color-feature);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-bar.pbi .gantt-bar-progress {
+    background-color: var(--color-pbi);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-bar.task .gantt-bar-progress {
+    background-color: var(--color-task);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-bar.bug .gantt-bar-progress {
+    background-color: var(--color-bug);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-bar.release .gantt-bar-progress {
+    background-color: var(--color-release);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-bar.unknown .gantt-bar-progress {
+    background-color: var(--color-unknown);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
 }
 
 .gantt-bar-content {
@@ -584,6 +635,9 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    /* Ensure readability on light backgrounds */
+    z-index: 2;
 }
 
 /* No dates indicator - Frame only bar */
