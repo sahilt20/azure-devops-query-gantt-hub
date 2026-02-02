@@ -165,11 +165,11 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         });
     }, []);
 
-    // Export to Excel/CSV
+    // Export to Excel/CSV with Gantt chart
     const handleExport = useCallback(() => {
         const timestamp = new Date().toISOString().split('T')[0];
-        exportService.exportToExcel(hierarchy, `gantt-export-${timestamp}`);
-    }, [hierarchy]);
+        exportService.exportToExcel(hierarchy, `gantt-export-${timestamp}`, dateRange);
+    }, [hierarchy, dateRange]);
 
     // Sync scroll between table and timeline - improved with requestAnimationFrame
     useEffect(() => {
