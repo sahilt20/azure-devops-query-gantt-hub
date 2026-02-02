@@ -590,7 +590,31 @@
 .gantt-bar.no-dates {
     background: transparent;
     border: 2px dashed var(--gantt-border);
-    opacity: 0.7;
+    opacity: 0.8;
+}
+
+.gantt-bar.no-dates.epic {
+    border-color: var(--color-epic);
+}
+
+.gantt-bar.no-dates.feature {
+    border-color: var(--color-feature);
+}
+
+.gantt-bar.no-dates.pbi {
+    border-color: var(--color-pbi);
+}
+
+.gantt-bar.no-dates.task {
+    border-color: var(--color-task);
+}
+
+.gantt-bar.no-dates.bug {
+    border-color: var(--color-bug);
+}
+
+.gantt-bar.no-dates.release {
+    border-color: var(--color-release);
 }
 
 .gantt-bar.no-dates .gantt-bar-content {

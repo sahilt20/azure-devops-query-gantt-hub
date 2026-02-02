@@ -24,22 +24,16 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     const hasRealDates = workItem.hasValidDates;
 
     const getTypeClass = (): string => {
-        const type = workItem.workItemType;
-        switch (type) {
-            case 'Epic': return 'epic';
-            case 'Feature': return 'feature';
-            case 'Product Backlog Item':
-            case 'User Story':
-            case 'Requirement':
-                return 'pbi';
-            case 'Task': return 'task';
-            case 'Bug':
-            case 'Issue':
-                return 'bug';
-            case 'Test Case': return 'task'; // Map Test Case to Task color (yellow)
-            case 'Release': return 'release';
-            default: return 'unknown';
-        }
+        const type = (workItem.workItemType || '').toLowerCase(); // Normalize to lowercase
+
+        if (type.includes('epic')) return 'epic';
+        if (type.includes('feature')) return 'feature';
+        if (type.includes('backlog') || type.includes('user story') || type.includes('requirement')) return 'pbi';
+        if (type.includes('task') || type.includes('test case')) return 'task';
+        if (type.includes('bug') || type.includes('issue')) return 'bug';
+        if (type.includes('release')) return 'release';
+
+        return 'unknown';
     };
 
     const handleClick = (e: React.MouseEvent) => {

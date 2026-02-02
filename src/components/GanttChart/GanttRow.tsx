@@ -36,39 +36,33 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     columnWidths = DEFAULT_WIDTHS
 }) => {
     const getTypeClass = (): string => {
-        const type = workItem.workItemType;
-        switch (type) {
-            case 'Epic': return 'epic';
-            case 'Feature': return 'feature';
-            case 'Product Backlog Item':
-            case 'User Story':
-            case 'Requirement':
-                return 'pbi';
-            case 'Task': return 'task';
-            case 'Bug':
-            case 'Issue':
-                return 'bug';
-            case 'Test Case': return 'task'; // Map Test Case to Task color (yellow)
-            case 'Release': return 'release';
-            default: return 'unknown';
-        }
+        const type = (workItem.workItemType || '').toLowerCase();
+
+        if (type.includes('epic')) return 'epic';
+        if (type.includes('feature')) return 'feature';
+        if (type.includes('backlog') || type.includes('user story') || type.includes('requirement')) return 'pbi';
+        if (type.includes('task') || type.includes('test case')) return 'task';
+        if (type.includes('bug') || type.includes('issue')) return 'bug';
+        if (type.includes('release')) return 'release';
+
+        return 'unknown';
     };
 
     const getTypeAbbr = (): string => {
-        const type = workItem.workItemType;
-        switch (type) {
-            case 'Epic': return 'E';
-            case 'Feature': return 'F';
-            case 'Product Backlog Item': return 'P';
-            case 'User Story': return 'S';
-            case 'Requirement': return 'R';
-            case 'Task': return 'T';
-            case 'Bug': return 'B';
-            case 'Issue': return 'I';
-            case 'Test Case': return 'C';
-            case 'Release': return 'R';
-            default: return type.charAt(0).toUpperCase();
-        }
+        const type = (workItem.workItemType || '').toLowerCase();
+
+        if (type.includes('epic')) return 'E';
+        if (type.includes('feature')) return 'F';
+        if (type.includes('backlog')) return 'P';
+        if (type.includes('user story')) return 'S';
+        if (type.includes('requirement')) return 'R';
+        if (type.includes('task')) return 'T';
+        if (type.includes('test case')) return 'C';
+        if (type.includes('bug')) return 'B';
+        if (type.includes('issue')) return 'I';
+        if (type.includes('release')) return 'R';
+
+        return (workItem.workItemType || '?').charAt(0).toUpperCase();
     };
 
     const getPercentClass = (percent: number): string => {
