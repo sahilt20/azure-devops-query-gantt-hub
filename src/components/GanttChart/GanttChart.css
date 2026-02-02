@@ -146,38 +146,34 @@
     border-color: #4299e1;
 }
 
-/* Main Content Area */
-.gantt-content {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
+/* Resizing state */
+.gantt-chart.resizing {
+    cursor: col-resize;
+    user-select: none;
 }
 
-/* Left Panel - Work Items Table */
-.gantt-table {
-    width: 450px;
-    min-width: 350px;
+/* Headers Row - Fixed at top */
+.gantt-headers {
+    display: flex;
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    border-right: 2px solid var(--gantt-border);
+    border-bottom: 1px solid var(--gantt-border);
 }
 
+/* Table Header */
 .gantt-table-header {
     display: grid;
-    grid-template-columns: 1fr 80px 80px 70px;
     background: var(--gantt-header-bg);
-    border-bottom: 1px solid var(--gantt-border);
     font-size: 12px;
     font-weight: 600;
     color: var(--gantt-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    /* Fixed height to match timeline header (months row + days row) */
     height: 70px;
     min-height: 70px;
     max-height: 70px;
     box-sizing: border-box;
+    flex-shrink: 0;
+    border-right: 2px solid var(--gantt-border);
 }
 
 .gantt-table-header-cell {
@@ -185,13 +181,62 @@
     display: flex;
     align-items: center;
     height: 100%;
+    position: relative;
 }
 
-.gantt-table-body {
+/* Resize Handle */
+.gantt-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s ease;
+    z-index: 10;
+}
+
+.gantt-resize-handle:hover,
+.gantt-chart.resizing .gantt-resize-handle {
+    background: #4299e1;
+}
+
+/* Timeline Header Wrapper */
+.gantt-timeline-header-wrapper {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-gutter: stable;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--gantt-header-bg);
+}
+
+.gantt-timeline-header-wrapper::-webkit-scrollbar {
+    display: none;
+}
+
+/* Single Scroll Container */
+.gantt-scroll-container {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.gantt-scroll-content {
+    display: flex;
+    min-height: min-content;
+}
+
+/* Table Body */
+.gantt-table-body {
+    flex-shrink: 0;
+    border-right: 2px solid var(--gantt-border);
+}
+
+/* Timeline Body */
+.gantt-timeline-body {
+    flex-shrink: 0;
+    position: relative;
 }
 
 /* Timeline Panel */
@@ -310,7 +355,7 @@
 /* Gantt Rows - Fixed alignment */
 .gantt-row {
     display: grid;
-    grid-template-columns: 1fr 80px 80px 70px;
+    /* grid-template-columns set inline for resizable columns */
     height: var(--gantt-row-height);
     min-height: var(--gantt-row-height);
     max-height: var(--gantt-row-height);
