@@ -26,6 +26,7 @@ interface IGanttChartProps {
     workItems: IWorkItemNode[];
     isLoading?: boolean;
     onWorkItemClick?: (workItem: IWorkItemNode) => void;
+    onRefresh?: () => void;
 }
 
 // Default column widths
@@ -39,7 +40,8 @@ const DEFAULT_COLUMN_WIDTHS = {
 export const GanttChart: React.FC<IGanttChartProps> = ({
     workItems,
     isLoading = false,
-    onWorkItemClick
+    onWorkItemClick,
+    onRefresh
 }) => {
     const [hierarchy, setHierarchy] = useState<IWorkItemNode[]>([]);
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
@@ -285,6 +287,14 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                         endDate={customDateRange?.end || defaultDateRange.end}
                         onRangeChange={handleDateRangeChange}
                     />
+                    <button
+                        className="gantt-btn gantt-btn-refresh"
+                        onClick={onRefresh}
+                        title="Refresh Data"
+                        style={{ marginRight: 8 }}
+                    >
+                        🔄
+                    </button>
                     <div className="gantt-view-modes">
                         <button
                             className={`gantt-view-mode-btn ${viewMode === 'day' ? 'active' : ''}`}

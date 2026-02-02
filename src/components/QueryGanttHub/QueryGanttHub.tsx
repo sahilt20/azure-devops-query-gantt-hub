@@ -221,6 +221,18 @@ export const QueryGanttHub: React.FC = () => {
         setDebugInfo('');
     };
 
+    // Refresh data
+    const handleRefresh = React.useCallback(() => {
+        if (selectedQueryId) {
+            executeQuery(selectedQueryId);
+        } else {
+            // If no query selected, assume "Load All" or just refresh whatever is there if we have items
+            if (workItems.length > 0) {
+                loadAllHierarchical();
+            }
+        }
+    }, [selectedQueryId, executeQuery, loadAllHierarchical, workItems.length]);
+
     return (
         <div className="query-gantt-hub">
             {/* Header */}
@@ -297,6 +309,7 @@ export const QueryGanttHub: React.FC = () => {
                     workItems={workItems}
                     isLoading={isLoading || isLoadingQueries}
                     onWorkItemClick={handleWorkItemClick}
+                    onRefresh={handleRefresh}
                 />
             </div>
         </div>
