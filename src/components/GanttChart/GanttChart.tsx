@@ -282,11 +282,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </div>
                 </div>
                 <div className="gantt-toolbar-right">
-                    <DateRangePicker
-                        startDate={customDateRange?.start || defaultDateRange.start}
-                        endDate={customDateRange?.end || defaultDateRange.end}
-                        onRangeChange={handleDateRangeChange}
-                    />
                     <button
                         className="gantt-btn gantt-btn-refresh"
                         onClick={onRefresh}
@@ -295,6 +290,11 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     >
                         🔄
                     </button>
+                    <DateRangePicker
+                        startDate={customDateRange?.start || defaultDateRange.start}
+                        endDate={customDateRange?.end || defaultDateRange.end}
+                        onRangeChange={handleDateRangeChange}
+                    />
                     <div className="gantt-view-modes">
                         <button
                             className={`gantt-view-mode-btn ${viewMode === 'day' ? 'active' : ''}`}
