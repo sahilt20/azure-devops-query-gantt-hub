@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { IWorkItemNode } from '../../models/WorkItemModels';
+import { azureDevOpsService } from '../../services/AzureDevOpsService';
 
 interface IGanttRowProps {
     workItem: IWorkItemNode;
@@ -64,6 +65,14 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
         }
     };
 
+    const handleTitleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Open work item in Azure DevOps
+        azureDevOpsService.openWorkItem(workItem.id);
+    };
+
+    const workItemUrl = azureDevOpsService.getWorkItemUrl(workItem.id);
+
     return (
         <div className={`gantt-row ${getTypeClass()}`} onClick={handleRowClick}>
             {/* Title with expand button and type icon */}
@@ -90,10 +99,17 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                     {getTypeAbbr()}
                 </span>
 
-                {/* Title */}
-                <span className="gantt-item-title" title={workItem.title}>
+                {/* Title as clickable link */}
+                <a
+                    className="gantt-item-title gantt-item-link"
+                    href={workItemUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`${workItem.title}\nClick to open in Azure DevOps`}
+                    onClick={handleTitleClick}
+                >
                     {workItem.title}
-                </span>
+                </a>
             </div>
 
             {/* Effort (rollup) */}

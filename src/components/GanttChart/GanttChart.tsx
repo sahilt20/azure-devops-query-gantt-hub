@@ -7,6 +7,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { IWorkItemNode, IGanttConfig } from '../../models/WorkItemModels';
 import { workItemHierarchyService } from '../../services/WorkItemHierarchyService';
 import { effortRollupService } from '../../services/EffortRollupService';
+import { exportService } from '../../services/ExportService';
 import {
     minDate,
     maxDate,
@@ -164,27 +165,46 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         });
     }, []);
 
-    // Sync scroll between table and timeline
+    // Export to Excel/CSV
+    const handleExport = useCallback(() => {
+        const timestamp = new Date().toISOString().split('T')[0];
+        exportService.exportToExcel(hierarchy, `gantt-export-${timestamp}`);
+    }, [hierarchy]);
+
+    // Sync scroll between table and timeline - improved with requestAnimationFrame
     useEffect(() => {
         const tableBody = tableBodyRef.current;
         const timelineBody = timelineBodyRef.current;
 
         if (!tableBody || !timelineBody) return;
 
+        let isScrollingTable = false;
+        let isScrollingTimeline = false;
+
         const handleTableScroll = () => {
-            if (timelineBody) {
-                timelineBody.scrollTop = tableBody.scrollTop;
-            }
+            if (isScrollingTimeline) return;
+            isScrollingTable = true;
+            requestAnimationFrame(() => {
+                if (timelineBody) {
+                    timelineBody.scrollTop = tableBody.scrollTop;
+                }
+                isScrollingTable = false;
+            });
         };
 
         const handleTimelineScroll = () => {
-            if (tableBody) {
-                tableBody.scrollTop = timelineBody.scrollTop;
-            }
+            if (isScrollingTable) return;
+            isScrollingTimeline = true;
+            requestAnimationFrame(() => {
+                if (tableBody) {
+                    tableBody.scrollTop = timelineBody.scrollTop;
+                }
+                isScrollingTimeline = false;
+            });
         };
 
-        tableBody.addEventListener('scroll', handleTableScroll);
-        timelineBody.addEventListener('scroll', handleTimelineScroll);
+        tableBody.addEventListener('scroll', handleTableScroll, { passive: true });
+        timelineBody.addEventListener('scroll', handleTimelineScroll, { passive: true });
 
         return () => {
             tableBody.removeEventListener('scroll', handleTableScroll);
@@ -302,6 +322,9 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </button>
                     <button className="gantt-btn" onClick={handleCollapseAll}>
                         Collapse All
+                    </button>
+                    <button className="gantt-btn gantt-btn-export" onClick={handleExport}>
+                        📥 Export
                     </button>
                 </div>
             </div>

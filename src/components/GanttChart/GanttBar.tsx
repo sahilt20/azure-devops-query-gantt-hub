@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { IWorkItemNode, WorkItemTypeColors } from '../../models/WorkItemModels';
+import { azureDevOpsService } from '../../services/AzureDevOpsService';
 
 interface IGanttBarProps {
     workItem: IWorkItemNode;
@@ -34,7 +35,12 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
         }
     };
 
-    const handleClick = () => {
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Open work item in Azure DevOps
+        azureDevOpsService.openWorkItem(workItem.id);
+
+        // Also call the onClick callback if provided
         if (onClick) {
             onClick(workItem);
         }
@@ -49,7 +55,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                     left: '5%',
                     width: '15%'
                 }}
-                title={`${workItem.title} - No dates set`}
+                title={`${workItem.title} - No dates set\nClick to open in Azure DevOps`}
                 onClick={handleClick}
             >
                 <div className="gantt-bar-content">
@@ -71,10 +77,11 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
             className={`gantt-bar ${getTypeClass()} ${isFrameOnly ? 'no-dates' : ''}`}
             style={{
                 left: `${clampedStart}%`,
-                width: `${clampedWidth}%`
+                width: `${clampedWidth}%`,
+                cursor: 'pointer'
             }}
             onClick={handleClick}
-            title={`${workItem.title}\n${workItem.percentComplete}% complete\nEffort: ${workItem.rollupEffort}h\nRemaining: ${workItem.rollupRemainingWork}h`}
+            title={`${workItem.title}\n${workItem.percentComplete}% complete\nEffort: ${workItem.rollupEffort}h\nRemaining: ${workItem.rollupRemainingWork}h\nClick to open in Azure DevOps`}
         >
             {/* Progress fill - only show for items with valid dates */}
             {!isFrameOnly && (

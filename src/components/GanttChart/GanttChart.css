@@ -398,7 +398,21 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-weight: 500;
+    font-size: 13px;
+    flex: 1;
+}
+
+/* Clickable title link */
+.gantt-item-link {
+    color: var(--gantt-text);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.gantt-item-link:hover {
+    color: #4299e1;
+    text-decoration: underline;
 }
 
 .gantt-cell-effort,
@@ -431,6 +445,19 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+.gantt-btn:active {
+    transform: translateY(1px);
+}
+
+.gantt-btn-export {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    color: white;
+}
+
+.gantt-btn-export:hover {
+    background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
 }
 
 .gantt-bar:hover {

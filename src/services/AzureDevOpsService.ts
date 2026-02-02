@@ -55,6 +55,41 @@ class AzureDevOpsService {
     }
 
     /**
+     * Get the organization name
+     */
+    public getOrganization(): string | null {
+        return this.organization;
+    }
+
+    /**
+     * Get the project name
+     */
+    public getProjectName(): string | null {
+        return this.projectName;
+    }
+
+    /**
+     * Get URL to view/edit a work item
+     */
+    public getWorkItemUrl(workItemId: number): string {
+        if (this.organization && this.projectName) {
+            return `https://dev.azure.com/${this.organization}/${encodeURIComponent(this.projectName)}/_workitems/edit/${workItemId}`;
+        }
+        // Fallback if not initialized
+        return `#work-item-${workItemId}`;
+    }
+
+    /**
+     * Open a work item in a new tab
+     */
+    public openWorkItem(workItemId: number): void {
+        const url = this.getWorkItemUrl(workItemId);
+        if (url.startsWith('http')) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+    }
+
+    /**
      * Initialize the SDK and get project context
      */
     public async initialize(): Promise<void> {
@@ -161,13 +196,6 @@ class AzureDevOpsService {
      */
     public getProjectId(): string | null {
         return this.projectId;
-    }
-
-    /**
-     * Get current project name
-     */
-    public getProjectName(): string | null {
-        return this.projectName;
     }
 
     /**
