@@ -2,6 +2,22 @@
  * Effort Rollup Service
  * Calculates effort rollup from Task level up through the hierarchy
  * and computes percent complete at each level
+ * 
+ * Calculation Rules:
+ * 1. EFFORT (h)
+ *    Task: EFFORT (h) = Planned Hours
+ *    PBI/Bug: EFFORT (h) = sum of Planned Hours on all child tasks
+ *    Feature/Epic: EFFORT (h) = sum of Planned Hours on all child PBIs and bugs
+ *
+ * 2. REMAINING (h)
+ *    Task: REMAINING (h) = Remaining Work
+ *    PBI/Bug: REMAINING (h) = sum of Remaining Work on all child tasks
+ *    Feature/Epic: REMAINING (h) = sum of Remaining Work on all child PBIs and bugs
+ *
+ * 3. DONE (%)
+ *    Task: DONE (%) = 100 - (Remaining Work * 100 / Planned Hours)
+ *    PBI/Bug: DONE (%) = roll up of Done for all child tasks
+ *    Feature/Epic: DONE (%) = roll up of Done for all child PBIs and bugs
  */
 
 import { IWorkItemNode } from '../models/WorkItemModels';
@@ -37,52 +53,133 @@ class EffortRollupService {
             this.calculateNodeRollup(child);
         }
 
-        if (node.children.length === 0) {
-            // Leaf node (typically Task)
-            // Use Remaining Work and Completed Work for tasks
-            if (node.workItemType === 'Task') {
-                // For tasks, effort is based on Original Estimate or sum of Remaining + Completed
-                const totalWork = node.originalEstimate || (node.remainingWork + node.completedWork);
-                node.rollupEffort = totalWork;
-                node.rollupCompletedWork = node.completedWork;
-                node.rollupRemainingWork = node.remainingWork;
-            } else {
-                // For leaf PBIs or Features without children, use their effort field
-                node.rollupEffort = node.effort || 0;
-                node.rollupCompletedWork = this.calculateCompletedFromState(node);
-                node.rollupRemainingWork = node.rollupEffort - node.rollupCompletedWork;
-            }
-        } else {
-            // Parent node - sum up all children's rollup values
-            node.rollupEffort = node.children.reduce(
-                (sum, child) => sum + child.rollupEffort,
-                0
-            );
-            node.rollupCompletedWork = node.children.reduce(
-                (sum, child) => sum + child.rollupCompletedWork,
-                0
-            );
-            node.rollupRemainingWork = node.children.reduce(
-                (sum, child) => sum + child.rollupRemainingWork,
-                0
-            );
-        }
+        // Set planned hours from originalEstimate for clarity
+        node.plannedHours = node.originalEstimate || 0;
 
-        // Calculate percent complete
-        node.percentComplete = this.calculatePercentComplete(node);
+        switch (node.workItemType) {
+            case 'Task':
+                this.calculateTaskRollup(node);
+                break;
+            case 'Product Backlog Item':
+            case 'Bug':
+                this.calculatePBIBugRollup(node);
+                break;
+            case 'Feature':
+            case 'Epic':
+                this.calculateFeatureEpicRollup(node);
+                break;
+            default:
+                // For unknown types, try to infer based on children
+                if (node.children.length > 0) {
+                    this.calculateFeatureEpicRollup(node);
+                } else {
+                    this.calculateTaskRollup(node);
+                }
+        }
     }
 
     /**
-     * Calculate percent complete for a node
+     * Calculate rollup for Task work items
+     * EFFORT = Planned Hours
+     * REMAINING = Remaining Work
+     * DONE = 100 - (Remaining Work * 100 / Planned Hours)
      */
-    private calculatePercentComplete(node: IWorkItemNode): number {
-        if (node.rollupEffort === 0) {
+    private calculateTaskRollup(node: IWorkItemNode): void {
+        node.rollupEffort = node.plannedHours || node.originalEstimate || 0;
+        node.rollupRemainingWork = node.remainingWork || 0;
+        node.rollupCompletedWork = node.completedWork || 0;
+
+        // Calculate percent complete
+        if (node.rollupEffort > 0) {
+            node.percentComplete = Math.round(100 - (node.rollupRemainingWork * 100 / node.rollupEffort));
+            node.percentComplete = Math.max(0, Math.min(100, node.percentComplete));
+        } else {
             // If no effort defined, use state-based calculation
-            return this.calculatePercentFromState(node);
+            node.percentComplete = this.calculatePercentFromState(node);
+        }
+    }
+
+    /**
+     * Calculate rollup for PBI/Bug work items
+     * EFFORT = sum of Planned Hours on all child tasks
+     * REMAINING = sum of Remaining Work on all child tasks
+     * DONE = roll up of Done for all child tasks
+     */
+    private calculatePBIBugRollup(node: IWorkItemNode): void {
+        const childTasks = this.getChildrenByTypes(node, ['Task']);
+
+        if (childTasks.length > 0) {
+            // Sum from child tasks
+            node.rollupEffort = childTasks.reduce((sum, child) => sum + child.rollupEffort, 0);
+            node.rollupRemainingWork = childTasks.reduce((sum, child) => sum + child.rollupRemainingWork, 0);
+            node.rollupCompletedWork = childTasks.reduce((sum, child) => sum + child.rollupCompletedWork, 0);
+
+            // Calculate weighted percent complete based on effort
+            node.percentComplete = this.calculateWeightedPercent(childTasks);
+        } else {
+            // No child tasks, use own values or effort field
+            node.rollupEffort = node.effort || 0;
+            node.rollupRemainingWork = 0;
+            node.rollupCompletedWork = this.calculateCompletedFromState(node);
+            node.percentComplete = this.calculatePercentFromState(node);
+        }
+    }
+
+    /**
+     * Calculate rollup for Feature/Epic work items
+     * EFFORT = sum of Planned Hours on all child PBIs and bugs
+     * REMAINING = sum of Remaining Work on all child PBIs and bugs
+     * DONE = roll up of Done for all child PBIs and bugs
+     */
+    private calculateFeatureEpicRollup(node: IWorkItemNode): void {
+        const childPBIsBugs = this.getChildrenByTypes(node, ['Product Backlog Item', 'Bug', 'Feature']);
+
+        if (childPBIsBugs.length > 0) {
+            // Sum from child PBIs/Bugs
+            node.rollupEffort = childPBIsBugs.reduce((sum, child) => sum + child.rollupEffort, 0);
+            node.rollupRemainingWork = childPBIsBugs.reduce((sum, child) => sum + child.rollupRemainingWork, 0);
+            node.rollupCompletedWork = childPBIsBugs.reduce((sum, child) => sum + child.rollupCompletedWork, 0);
+
+            // Calculate weighted percent complete based on effort
+            node.percentComplete = this.calculateWeightedPercent(childPBIsBugs);
+        } else if (node.children.length > 0) {
+            // Has children but not PBIs/Bugs - sum all children
+            node.rollupEffort = node.children.reduce((sum, child) => sum + child.rollupEffort, 0);
+            node.rollupRemainingWork = node.children.reduce((sum, child) => sum + child.rollupRemainingWork, 0);
+            node.rollupCompletedWork = node.children.reduce((sum, child) => sum + child.rollupCompletedWork, 0);
+            node.percentComplete = this.calculateWeightedPercent(node.children);
+        } else {
+            // No children
+            node.rollupEffort = 0;
+            node.rollupRemainingWork = 0;
+            node.rollupCompletedWork = 0;
+            node.percentComplete = this.calculatePercentFromState(node);
+        }
+    }
+
+    /**
+     * Get children by specific work item types
+     */
+    private getChildrenByTypes(node: IWorkItemNode, types: string[]): IWorkItemNode[] {
+        return node.children.filter(child => types.includes(child.workItemType));
+    }
+
+    /**
+     * Calculate weighted percent complete based on effort
+     */
+    private calculateWeightedPercent(nodes: IWorkItemNode[]): number {
+        const totalEffort = nodes.reduce((sum, n) => sum + n.rollupEffort, 0);
+
+        if (totalEffort === 0) {
+            // If no effort, use simple average
+            if (nodes.length === 0) return 0;
+            const totalPercent = nodes.reduce((sum, n) => sum + n.percentComplete, 0);
+            return Math.round(totalPercent / nodes.length);
         }
 
-        const percent = (node.rollupCompletedWork / node.rollupEffort) * 100;
-        return Math.round(Math.min(100, Math.max(0, percent)));
+        // Weighted average based on effort
+        const weightedSum = nodes.reduce((sum, n) => sum + (n.percentComplete * n.rollupEffort), 0);
+        return Math.round(weightedSum / totalEffort);
     }
 
     /**
@@ -105,15 +202,6 @@ class EffortRollupService {
      * Calculate percent complete based on state
      */
     private calculatePercentFromState(node: IWorkItemNode): number {
-        if (node.children.length > 0) {
-            // For parent nodes, average the children's percent
-            const totalPercent = node.children.reduce(
-                (sum, child) => sum + child.percentComplete,
-                0
-            );
-            return Math.round(totalPercent / node.children.length);
-        }
-
         const state = node.state.toLowerCase();
 
         if (this.isDoneState(state)) {

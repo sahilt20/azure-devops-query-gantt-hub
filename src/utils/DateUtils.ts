@@ -211,3 +211,40 @@ export function getDatePositionPercent(date: Date | string, rangeStart: Date | s
     const daysFromStart = diffInDays(rangeStart, date);
     return Math.max(0, Math.min(100, (daysFromStart / totalDays) * 100));
 }
+
+/**
+ * Add working hours to a date (based on 7h working day)
+ * Skips weekends when calculating
+ * @param date Starting date
+ * @param hours Number of hours to add
+ * @returns End date after adding working hours
+ */
+export function addWorkingHours(date: Date | string, hours: number): Date {
+    const d = toDate(date);
+    if (!d || hours <= 0) return d || new Date();
+
+    const HOURS_PER_DAY = 7;
+    let remainingHours = hours;
+    let current = new Date(d);
+
+    while (remainingHours > 0) {
+        // Move to next day
+        current = addDays(current, 1);
+
+        // Skip weekends
+        if (!isWeekend(current)) {
+            remainingHours -= HOURS_PER_DAY;
+        }
+    }
+
+    return current;
+}
+
+/**
+ * Calculate duration in working days from hours (based on 7h working day)
+ */
+export function hoursToWorkingDays(hours: number): number {
+    if (hours <= 0) return 0;
+    const HOURS_PER_DAY = 7;
+    return Math.ceil(hours / HOURS_PER_DAY);
+}

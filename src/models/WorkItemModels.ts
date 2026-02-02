@@ -15,13 +15,18 @@ export interface IWorkItemNode {
 
     // Effort fields
     effort: number;                 // Story Points / Effort (for PBI)
-    originalEstimate: number;       // Original Estimate hours (for Task)
+    originalEstimate: number;       // Original Estimate hours (for Task) = Planned Hours
     remainingWork: number;          // Remaining Work hours (for Task)
     completedWork: number;          // Completed Work hours (for Task)
+    plannedHours: number;           // Planned Hours (alias for originalEstimate for clarity)
 
     // Date fields
     startDate: Date | null;
     targetDate: Date | null;
+    devCompletionDate: Date | null;  // Dev Completion Date for PBI/Bug
+    qaCompletionDate: Date | null;   // QA Completion Date for PBI/Bug
+    iterationStartDate: Date | null; // Iteration Path start date
+    iterationEndDate: Date | null;   // Iteration Path end date
 
     // Hierarchy
     parentId: number | null;
@@ -30,20 +35,21 @@ export interface IWorkItemNode {
     isExpanded: boolean;
 
     // Calculated rollup fields
-    rollupEffort: number;           // Sum of all descendant effort/work
+    rollupEffort: number;           // Sum of all descendant effort/work (Planned Hours)
     rollupCompletedWork: number;    // Sum of all descendant completed work
     rollupRemainingWork: number;    // Sum of all descendant remaining work
-    percentComplete: number;        // (completedWork / totalWork) * 100
+    percentComplete: number;        // Done % calculation
 
     // Calculated date range (for Gantt positioning)
     calculatedStartDate: Date | null;
     calculatedEndDate: Date | null;
+    hasValidDates: boolean;         // True if dates are real, false if default 2-day duration
 }
 
 /**
  * Work item types in the hierarchy
  */
-export type WorkItemType = 'Epic' | 'Feature' | 'Product Backlog Item' | 'Task' | 'Bug' | 'Unknown';
+export type WorkItemType = 'Epic' | 'Feature' | 'Product Backlog Item' | 'Task' | 'Bug' | 'Release' | 'Unknown';
 
 /**
  * Mapping of work item type to hierarchy level
@@ -53,6 +59,7 @@ export const WorkItemTypeLevel: Record<WorkItemType, number> = {
     'Feature': 1,
     'Product Backlog Item': 2,
     'Bug': 2,  // Bugs are at same level as PBI
+    'Release': 2,
     'Task': 3,
     'Unknown': 4
 };
@@ -61,12 +68,13 @@ export const WorkItemTypeLevel: Record<WorkItemType, number> = {
  * Colors for each work item type
  */
 export const WorkItemTypeColors: Record<WorkItemType, string> = {
-    'Epic': '#7b68ee',       // Medium Slate Blue
-    'Feature': '#1e90ff',    // Dodger Blue
-    'Product Backlog Item': '#32cd32',  // Lime Green
-    'Bug': '#dc143c',        // Crimson
-    'Task': '#ffa500',       // Orange
-    'Unknown': '#808080'     // Gray
+    'Epic': '#ed8936',       // Orange
+    'Feature': '#9f7aea',    // Purple
+    'Product Backlog Item': '#4299e1',  // Blue
+    'Bug': '#f56565',        // Red
+    'Task': '#ecc94b',       // Yellow
+    'Release': '#48bb78',    // Green
+    'Unknown': '#718096'     // Gray
 };
 
 /**
@@ -78,6 +86,7 @@ export const WorkItemTypeIcons: Record<WorkItemType, string> = {
     'Product Backlog Item': 'BacklogBoard',
     'Bug': 'Bug',
     'Task': 'TaskBoard',
+    'Release': 'Rocket',
     'Unknown': 'Unknown'
 };
 
@@ -141,8 +150,13 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         originalEstimate: 0,
         remainingWork: 0,
         completedWork: 0,
+        plannedHours: 0,
         startDate: null,
         targetDate: null,
+        devCompletionDate: null,
+        qaCompletionDate: null,
+        iterationStartDate: null,
+        iterationEndDate: null,
         parentId: null,
         children: [],
         level: 0,
@@ -153,6 +167,7 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         percentComplete: 0,
         calculatedStartDate: null,
         calculatedEndDate: null,
+        hasValidDates: false,
         ...partial
     };
 }

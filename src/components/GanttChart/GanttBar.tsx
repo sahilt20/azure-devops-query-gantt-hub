@@ -20,6 +20,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     onClick
 }) => {
     const hasValidDates = startPercent >= 0 && widthPercent > 0;
+    const hasRealDates = workItem.hasValidDates;
 
     const getTypeClass = (): string => {
         switch (workItem.workItemType) {
@@ -28,7 +29,8 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
             case 'Product Backlog Item': return 'pbi';
             case 'Task': return 'task';
             case 'Bug': return 'bug';
-            default: return 'task';
+            case 'Release': return 'release';
+            default: return 'unknown';
         }
     };
 
@@ -45,9 +47,10 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                 className="gantt-bar no-dates"
                 style={{
                     left: '5%',
-                    width: '20%'
+                    width: '15%'
                 }}
                 title={`${workItem.title} - No dates set`}
+                onClick={handleClick}
             >
                 <div className="gantt-bar-content">
                     No dates
@@ -60,21 +63,26 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     const clampedStart = Math.max(0, Math.min(100 - 1, startPercent));
     const clampedWidth = Math.max(1, Math.min(100 - clampedStart, widthPercent));
 
+    // Determine if this is a frame-only bar (default 2-day duration)
+    const isFrameOnly = !hasRealDates;
+
     return (
         <div
-            className={`gantt-bar ${getTypeClass()}`}
+            className={`gantt-bar ${getTypeClass()} ${isFrameOnly ? 'no-dates' : ''}`}
             style={{
                 left: `${clampedStart}%`,
                 width: `${clampedWidth}%`
             }}
             onClick={handleClick}
-            title={`${workItem.title}\n${workItem.percentComplete}% complete\nEffort: ${workItem.rollupEffort}h`}
+            title={`${workItem.title}\n${workItem.percentComplete}% complete\nEffort: ${workItem.rollupEffort}h\nRemaining: ${workItem.rollupRemainingWork}h`}
         >
-            {/* Progress fill */}
-            <div
-                className="gantt-bar-progress"
-                style={{ width: `${workItem.percentComplete}%` }}
-            />
+            {/* Progress fill - only show for items with valid dates */}
+            {!isFrameOnly && (
+                <div
+                    className="gantt-bar-progress"
+                    style={{ width: `${workItem.percentComplete}%` }}
+                />
+            )}
 
             {/* Bar content - only show if bar is wide enough */}
             {clampedWidth > 5 && (

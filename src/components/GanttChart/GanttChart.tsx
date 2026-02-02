@@ -17,6 +17,7 @@ import {
 import { GanttRow } from './GanttRow';
 import { GanttBar } from './GanttBar';
 import { GanttTimeline } from './GanttTimeline';
+import { DateRangePicker } from './DateRangePicker';
 import './GanttChart.css';
 
 interface IGanttChartProps {
@@ -32,6 +33,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
 }) => {
     const [hierarchy, setHierarchy] = useState<IWorkItemNode[]>([]);
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
+    const [customDateRange, setCustomDateRange] = useState<{ start: Date; end: Date } | null>(null);
     const tableBodyRef = useRef<HTMLDivElement>(null);
     const timelineBodyRef = useRef<HTMLDivElement>(null);
 
@@ -47,13 +49,18 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         }
     }, [workItems]);
 
+    // Reset custom date range when work items change
+    useEffect(() => {
+        setCustomDateRange(null);
+    }, [workItems]);
+
     // Flatten hierarchy for rendering (respecting expand/collapse state)
     const flattenedItems = useMemo(() => {
         return workItemHierarchyService.flattenHierarchy(hierarchy, true);
     }, [hierarchy]);
 
-    // Calculate date range for the timeline
-    const dateRange = useMemo(() => {
+    // Calculate default date range from work items (earliest Start → longest Target)
+    const defaultDateRange = useMemo(() => {
         if (flattenedItems.length === 0) {
             const today = new Date();
             return {
@@ -62,32 +69,48 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
             };
         }
 
-        const allDates: Date[] = [];
+        const startDates: Date[] = [];
+        const endDates: Date[] = [];
 
         for (const item of flattenedItems) {
-            if (item.calculatedStartDate) allDates.push(item.calculatedStartDate);
-            if (item.calculatedEndDate) allDates.push(item.calculatedEndDate);
-            if (item.startDate) allDates.push(item.startDate);
-            if (item.targetDate) allDates.push(item.targetDate);
+            // Collect start dates
+            if (item.startDate) startDates.push(item.startDate);
+            if (item.calculatedStartDate) startDates.push(item.calculatedStartDate);
+
+            // Collect end dates (Target Date is the longest)
+            if (item.targetDate) endDates.push(item.targetDate);
+            if (item.calculatedEndDate) endDates.push(item.calculatedEndDate);
+            if (item.devCompletionDate) endDates.push(item.devCompletionDate);
+            if (item.qaCompletionDate) endDates.push(item.qaCompletionDate);
         }
 
-        if (allDates.length === 0) {
-            const today = new Date();
-            return {
-                start: addDays(today, -7),
-                end: addDays(today, 30)
-            };
-        }
+        const earliestStart = minDate(...startDates);
+        const longestEnd = maxDate(...endDates);
 
-        const min = minDate(...allDates)!;
-        const max = maxDate(...allDates)!;
-
-        // Add some padding
+        const today = new Date();
         return {
-            start: addDays(min, -7),
-            end: addDays(max, 14)
+            start: earliestStart || addDays(today, -7),
+            end: longestEnd || addDays(today, 30)
         };
     }, [flattenedItems]);
+
+    // Active date range (custom or default with padding)
+    const dateRange = useMemo(() => {
+        if (customDateRange) {
+            return customDateRange;
+        }
+
+        // Add padding to default range for visual comfort
+        return {
+            start: addDays(defaultDateRange.start, -7),
+            end: addDays(defaultDateRange.end, 14)
+        };
+    }, [customDateRange, defaultDateRange]);
+
+    // Handle date range change from picker
+    const handleDateRangeChange = useCallback((start: Date, end: Date) => {
+        setCustomDateRange({ start, end });
+    }, []);
 
     // Gantt configuration
     const ganttConfig: IGanttConfig = useMemo(() => ({
@@ -244,6 +267,13 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </div>
                 </div>
                 <div className="gantt-toolbar-right">
+                    {/* Date Range Picker - Before view mode selector */}
+                    <DateRangePicker
+                        startDate={customDateRange?.start || defaultDateRange.start}
+                        endDate={customDateRange?.end || defaultDateRange.end}
+                        onRangeChange={handleDateRangeChange}
+                    />
+
                     {/* View Mode Toggle */}
                     <div className="gantt-view-modes">
                         <button

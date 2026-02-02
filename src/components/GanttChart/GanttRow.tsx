@@ -24,7 +24,8 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
             case 'Product Backlog Item': return 'pbi';
             case 'Task': return 'task';
             case 'Bug': return 'bug';
-            default: return 'task';
+            case 'Release': return 'release';
+            default: return 'unknown';
         }
     };
 
@@ -35,6 +36,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
             case 'Product Backlog Item': return 'P';
             case 'Task': return 'T';
             case 'Bug': return 'B';
+            case 'Release': return 'R';
             default: return '?';
         }
     };

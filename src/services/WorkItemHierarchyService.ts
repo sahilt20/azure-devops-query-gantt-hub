@@ -1,6 +1,12 @@
 /**
  * Work Item Hierarchy Service
  * Builds hierarchical structure from flat work items: Epic → Feature → PBI → Task
+ * 
+ * Bar Duration Calculation Rules:
+ * - Feature/Epic: Start Date → Target Date; fallback to child PBI/Bug date range
+ * - PBI/Bug: Start Date → Dev/QA Completion Date; fallback to child task dates + Planned Hours
+ * - Task: Start Date + Planned Hours (7h working day); fallback to Iteration Path start + Planned Hours
+ * - Default: 2 days with empty bar if no dates/children
  */
 
 import { WorkItem } from 'azure-devops-extension-api/WorkItemTracking';
@@ -10,7 +16,7 @@ import {
     WorkItemTypeLevel,
     createEmptyWorkItemNode
 } from '../models/WorkItemModels';
-import { parseAzureDate, minDate, maxDate } from '../utils/DateUtils';
+import { parseAzureDate, minDate, maxDate, addDays, addWorkingHours } from '../utils/DateUtils';
 
 class WorkItemHierarchyService {
     private static instance: WorkItemHierarchyService;
@@ -30,6 +36,7 @@ class WorkItemHierarchyService {
     public convertToNode(workItem: WorkItem): IWorkItemNode {
         const fields = workItem.fields || {};
         const workItemType = this.normalizeWorkItemType(fields['System.WorkItemType']);
+        const originalEstimate = this.parseNumber(fields['Microsoft.VSTS.Scheduling.OriginalEstimate']);
 
         return createEmptyWorkItemNode({
             id: workItem.id,
@@ -38,15 +45,31 @@ class WorkItemHierarchyService {
             state: fields['System.State'] || '',
             assignedTo: this.getAssignedTo(fields['System.AssignedTo']),
             effort: this.parseNumber(fields['Microsoft.VSTS.Scheduling.Effort']),
-            originalEstimate: this.parseNumber(fields['Microsoft.VSTS.Scheduling.OriginalEstimate']),
+            originalEstimate,
+            plannedHours: originalEstimate, // Alias for clarity
             remainingWork: this.parseNumber(fields['Microsoft.VSTS.Scheduling.RemainingWork']),
             completedWork: this.parseNumber(fields['Microsoft.VSTS.Scheduling.CompletedWork']),
             startDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.StartDate']),
             targetDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.TargetDate']),
+            devCompletionDate: parseAzureDate(fields['Custom.DevCompletionDate'] || fields['Microsoft.VSTS.Scheduling.FinishDate']),
+            qaCompletionDate: parseAzureDate(fields['Custom.QACompletionDate']),
+            iterationStartDate: this.parseIterationDates(fields['System.IterationPath'])?.start || null,
+            iterationEndDate: this.parseIterationDates(fields['System.IterationPath'])?.end || null,
             parentId: this.parseNumber(fields['System.Parent']) || null,
             level: WorkItemTypeLevel[workItemType],
-            isExpanded: true
+            isExpanded: true,
+            hasValidDates: false // Will be set during date calculation
         });
+    }
+
+    /**
+     * Parse iteration path to get start and end dates
+     * Note: This is a placeholder - actual implementation would need to query iteration info
+     */
+    private parseIterationDates(_iterationPath: string | undefined): { start: Date | null; end: Date | null } | null {
+        // In a real implementation, we would query the iteration API
+        // For now, return null and fall back to other date logic
+        return null;
     }
 
     /**
@@ -77,7 +100,7 @@ class WorkItemHierarchyService {
         // Sort children at each level
         this.sortHierarchy(rootNodes);
 
-        // Calculate date ranges for parent nodes
+        // Calculate date ranges for all nodes
         this.calculateDateRanges(rootNodes);
 
         return rootNodes;
@@ -152,7 +175,8 @@ class WorkItemHierarchyService {
     }
 
     /**
-     * Calculate date ranges for parent nodes based on children
+     * Calculate date ranges for all nodes based on work item type
+     * Uses different logic for Feature/Epic, PBI/Bug, and Task
      */
     private calculateDateRanges(nodes: IWorkItemNode[]): void {
         for (const node of nodes) {
@@ -161,24 +185,189 @@ class WorkItemHierarchyService {
                 this.calculateDateRanges(node.children);
             }
 
-            // Calculate the effective date range
-            if (node.children.length > 0) {
-                // Parent date range spans all children
-                const childStarts = node.children
-                    .map(c => c.calculatedStartDate || c.startDate)
-                    .filter((d): d is Date => d !== null);
-                const childEnds = node.children
-                    .map(c => c.calculatedEndDate || c.targetDate)
-                    .filter((d): d is Date => d !== null);
-
-                node.calculatedStartDate = node.startDate || minDate(...childStarts);
-                node.calculatedEndDate = node.targetDate || maxDate(...childEnds);
-            } else {
-                // Leaf node - use its own dates
-                node.calculatedStartDate = node.startDate;
-                node.calculatedEndDate = node.targetDate;
+            // Calculate based on work item type
+            switch (node.workItemType) {
+                case 'Task':
+                    this.calculateTaskDates(node);
+                    break;
+                case 'Product Backlog Item':
+                case 'Bug':
+                    this.calculatePBIBugDates(node);
+                    break;
+                case 'Feature':
+                case 'Epic':
+                case 'Release':
+                    this.calculateFeatureEpicDates(node);
+                    break;
+                default:
+                    this.calculateDefaultDates(node);
             }
         }
+    }
+
+    /**
+     * Calculate dates for Task work items
+     * - Use Start Date + Planned Hours (7h working day)
+     * - Fallback to Iteration Path start + Planned Hours
+     * - Default: 2 days, frame-only bar
+     */
+    private calculateTaskDates(node: IWorkItemNode): void {
+        const startDate = node.startDate || node.iterationStartDate;
+        const plannedHours = node.plannedHours || node.originalEstimate || 0;
+
+        if (startDate && plannedHours > 0) {
+            node.calculatedStartDate = startDate;
+            node.calculatedEndDate = addWorkingHours(startDate, plannedHours);
+            node.hasValidDates = true;
+        } else if (startDate && node.targetDate) {
+            // Has start and target date
+            node.calculatedStartDate = startDate;
+            node.calculatedEndDate = node.targetDate;
+            node.hasValidDates = true;
+        } else if (startDate) {
+            // Has only start date, estimate 1 day duration
+            node.calculatedStartDate = startDate;
+            node.calculatedEndDate = addDays(startDate, 1);
+            node.hasValidDates = true;
+        } else {
+            // No dates - use default 2 days
+            this.setDefaultDates(node);
+        }
+    }
+
+    /**
+     * Calculate dates for PBI/Bug work items
+     * - Use Start Date → Dev/QA Completion Date
+     * - Fallback: earliest child Start Date + sum of Planned Hours (7h working day)
+     * - Default: 2 days, frame-only bar
+     */
+    private calculatePBIBugDates(node: IWorkItemNode): void {
+        const completionDate = node.devCompletionDate || node.qaCompletionDate || node.targetDate;
+
+        if (node.startDate && completionDate) {
+            // Has explicit dates
+            node.calculatedStartDate = node.startDate;
+            node.calculatedEndDate = completionDate;
+            node.hasValidDates = true;
+        } else if (node.children.length > 0) {
+            // Calculate from children
+            const childDates = this.getChildDateRange(node.children);
+
+            if (childDates.start) {
+                node.calculatedStartDate = node.startDate || childDates.start;
+
+                if (childDates.end) {
+                    node.calculatedEndDate = completionDate || childDates.end;
+                } else {
+                    // Calculate from child planned hours
+                    const totalPlannedHours = node.children.reduce(
+                        (sum, child) => sum + (child.plannedHours || child.originalEstimate || 0),
+                        0
+                    );
+                    if (totalPlannedHours > 0) {
+                        node.calculatedEndDate = addWorkingHours(node.calculatedStartDate, totalPlannedHours);
+                    } else {
+                        node.calculatedEndDate = addDays(node.calculatedStartDate, 7);
+                    }
+                }
+                node.hasValidDates = true;
+            } else {
+                this.setDefaultDates(node);
+            }
+        } else if (node.startDate) {
+            // Has only start date
+            node.calculatedStartDate = node.startDate;
+            node.calculatedEndDate = completionDate || addDays(node.startDate, 5);
+            node.hasValidDates = true;
+        } else {
+            // No dates, no children
+            this.setDefaultDates(node);
+        }
+    }
+
+    /**
+     * Calculate dates for Feature/Epic work items
+     * - Use Start Date → Target Date
+     * - Fallback: earliest child Start Date → longest child Dev/QA Completion Date
+     * - Default: 2 days, frame-only bar
+     */
+    private calculateFeatureEpicDates(node: IWorkItemNode): void {
+        if (node.startDate && node.targetDate) {
+            // Has explicit dates
+            node.calculatedStartDate = node.startDate;
+            node.calculatedEndDate = node.targetDate;
+            node.hasValidDates = true;
+        } else if (node.children.length > 0) {
+            // Calculate from children
+            const childDates = this.getChildDateRange(node.children);
+
+            node.calculatedStartDate = node.startDate || childDates.start;
+            node.calculatedEndDate = node.targetDate || childDates.end;
+
+            if (node.calculatedStartDate && node.calculatedEndDate) {
+                node.hasValidDates = true;
+            } else if (node.calculatedStartDate) {
+                // Has start but no end - estimate based on children
+                node.calculatedEndDate = addDays(node.calculatedStartDate, 14);
+                node.hasValidDates = true;
+            } else {
+                this.setDefaultDates(node);
+            }
+        } else if (node.startDate) {
+            // Has only start date
+            node.calculatedStartDate = node.startDate;
+            node.calculatedEndDate = node.targetDate || addDays(node.startDate, 30);
+            node.hasValidDates = true;
+        } else {
+            // No dates, no children
+            this.setDefaultDates(node);
+        }
+    }
+
+    /**
+     * Calculate dates for unknown work item types
+     */
+    private calculateDefaultDates(node: IWorkItemNode): void {
+        if (node.startDate && node.targetDate) {
+            node.calculatedStartDate = node.startDate;
+            node.calculatedEndDate = node.targetDate;
+            node.hasValidDates = true;
+        } else if (node.children.length > 0) {
+            const childDates = this.getChildDateRange(node.children);
+            node.calculatedStartDate = node.startDate || childDates.start;
+            node.calculatedEndDate = node.targetDate || childDates.end;
+            node.hasValidDates = !!(node.calculatedStartDate && node.calculatedEndDate);
+        } else {
+            this.setDefaultDates(node);
+        }
+    }
+
+    /**
+     * Set default 2-day duration (frame-only bar)
+     */
+    private setDefaultDates(node: IWorkItemNode): void {
+        const today = new Date();
+        node.calculatedStartDate = node.startDate || today;
+        node.calculatedEndDate = addDays(node.calculatedStartDate, 2);
+        node.hasValidDates = false;
+    }
+
+    /**
+     * Get the date range from a list of child nodes
+     */
+    private getChildDateRange(children: IWorkItemNode[]): { start: Date | null; end: Date | null } {
+        const childStarts = children
+            .map(c => c.calculatedStartDate || c.startDate)
+            .filter((d): d is Date => d !== null);
+
+        const childEnds = children
+            .map(c => c.calculatedEndDate || c.targetDate || c.devCompletionDate || c.qaCompletionDate)
+            .filter((d): d is Date => d !== null);
+
+        return {
+            start: minDate(...childStarts),
+            end: maxDate(...childEnds)
+        };
     }
 
     /**
@@ -266,6 +455,7 @@ class WorkItemHierarchyService {
         if (normalized === 'product backlog item' || normalized === 'pbi') return 'Product Backlog Item';
         if (normalized === 'task') return 'Task';
         if (normalized === 'bug') return 'Bug';
+        if (normalized === 'release') return 'Release';
 
         return 'Unknown';
     }
