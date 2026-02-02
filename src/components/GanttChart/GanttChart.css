@@ -173,12 +173,18 @@
     color: var(--gantt-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    /* Fixed height to match timeline header (months row + days row) */
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+    box-sizing: border-box;
 }
 
 .gantt-table-header-cell {
-    padding: 12px 10px;
+    padding: 0 10px;
     display: flex;
     align-items: center;
+    height: 100%;
 }
 
 .gantt-table-body {
@@ -197,12 +203,16 @@
     background: var(--gantt-row-bg);
 }
 
-/* Timeline Header */
+/* Timeline Header - matches table header height */
 .gantt-timeline-header {
     background: var(--gantt-header-bg);
     border-bottom: 1px solid var(--gantt-border);
     overflow-x: auto;
     overflow-y: hidden;
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+    box-sizing: border-box;
 }
 
 .gantt-timeline-header::-webkit-scrollbar {
