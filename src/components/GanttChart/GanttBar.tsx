@@ -24,12 +24,19 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     const hasRealDates = workItem.hasValidDates;
 
     const getTypeClass = (): string => {
-        switch (workItem.workItemType) {
+        const type = workItem.workItemType;
+        switch (type) {
             case 'Epic': return 'epic';
             case 'Feature': return 'feature';
-            case 'Product Backlog Item': return 'pbi';
+            case 'Product Backlog Item':
+            case 'User Story':
+            case 'Requirement':
+                return 'pbi';
             case 'Task': return 'task';
-            case 'Bug': return 'bug';
+            case 'Bug':
+            case 'Issue':
+                return 'bug';
+            case 'Test Case': return 'task'; // Map Test Case to Task color (yellow)
             case 'Release': return 'release';
             default: return 'unknown';
         }

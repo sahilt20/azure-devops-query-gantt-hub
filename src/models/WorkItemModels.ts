@@ -49,18 +49,26 @@ export interface IWorkItemNode {
 /**
  * Work item types in the hierarchy
  */
-export type WorkItemType = 'Epic' | 'Feature' | 'Product Backlog Item' | 'Task' | 'Bug' | 'Release' | 'Unknown';
+/**
+ * Work item types in the hierarchy
+ * Using string to support custom process template types (User Story, Requirement, Issue, etc.)
+ */
+export type WorkItemType = string;
 
 /**
  * Mapping of work item type to hierarchy level
  */
-export const WorkItemTypeLevel: Record<WorkItemType, number> = {
+export const WorkItemTypeLevel: Record<string, number> = {
     'Epic': 0,
     'Feature': 1,
     'Product Backlog Item': 2,
-    'Bug': 2,  // Bugs are at same level as PBI
+    'User Story': 2,
+    'Requirement': 2,
+    'Bug': 2,
+    'Issue': 2,
     'Release': 2,
     'Task': 3,
+    'Test Case': 3,
     'Unknown': 4
 };
 
@@ -71,8 +79,12 @@ export const WorkItemTypeColors: Record<WorkItemType, string> = {
     'Epic': '#ed8936',       // Orange
     'Feature': '#9f7aea',    // Purple
     'Product Backlog Item': '#4299e1',  // Blue
+    'User Story': '#4299e1', // Blue (same as PBI)
+    'Requirement': '#4299e1', // Blue (same as PBI)
     'Bug': '#f56565',        // Red
+    'Issue': '#f56565',      // Red (same as Bug)
     'Task': '#ecc94b',       // Yellow
+    'Test Case': '#ecc94b',  // Yellow (same as Task)
     'Release': '#48bb78',    // Green
     'Unknown': '#718096'     // Gray
 };
@@ -84,8 +96,12 @@ export const WorkItemTypeIcons: Record<WorkItemType, string> = {
     'Epic': 'Crown',
     'Feature': 'Trophy2',
     'Product Backlog Item': 'BacklogBoard',
+    'User Story': 'BacklogBoard',
+    'Requirement': 'BacklogBoard',
     'Bug': 'Bug',
+    'Issue': 'Bug',
     'Task': 'TaskBoard',
+    'Test Case': 'TaskBoard',
     'Release': 'Rocket',
     'Unknown': 'Unknown'
 };

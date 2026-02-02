@@ -36,26 +36,38 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     columnWidths = DEFAULT_WIDTHS
 }) => {
     const getTypeClass = (): string => {
-        switch (workItem.workItemType) {
+        const type = workItem.workItemType;
+        switch (type) {
             case 'Epic': return 'epic';
             case 'Feature': return 'feature';
-            case 'Product Backlog Item': return 'pbi';
+            case 'Product Backlog Item':
+            case 'User Story':
+            case 'Requirement':
+                return 'pbi';
             case 'Task': return 'task';
-            case 'Bug': return 'bug';
+            case 'Bug':
+            case 'Issue':
+                return 'bug';
+            case 'Test Case': return 'task'; // Map Test Case to Task color (yellow)
             case 'Release': return 'release';
             default: return 'unknown';
         }
     };
 
     const getTypeAbbr = (): string => {
-        switch (workItem.workItemType) {
+        const type = workItem.workItemType;
+        switch (type) {
             case 'Epic': return 'E';
             case 'Feature': return 'F';
             case 'Product Backlog Item': return 'P';
+            case 'User Story': return 'S';
+            case 'Requirement': return 'R';
             case 'Task': return 'T';
             case 'Bug': return 'B';
+            case 'Issue': return 'I';
+            case 'Test Case': return 'C';
             case 'Release': return 'R';
-            default: return '?';
+            default: return type.charAt(0).toUpperCase();
         }
     };
 
