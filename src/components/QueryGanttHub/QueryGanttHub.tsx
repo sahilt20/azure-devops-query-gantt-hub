@@ -10,6 +10,7 @@ import { workItemHierarchyService } from '../../services/WorkItemHierarchyServic
 import { effortRollupService } from '../../services/EffortRollupService';
 import { generateSampleWorkItems, sampleQueries } from '../../services/MockDataService';
 import { GanttChart } from '../GanttChart/GanttChart';
+import { QuerySelector } from '../QuerySelector/QuerySelector';
 import './QueryGanttHub.css';
 
 // Check if running in development mode (localhost)
@@ -260,30 +261,18 @@ export const QueryGanttHub: React.FC = () => {
 
                     {/* Query Selector */}
                     <div className="query-selector">
-                        <label htmlFor="query-select">Select Query:</label>
-                        <select
-                            id="query-select"
-                            value={selectedQueryId}
-                            onChange={handleQueryChange}
-                            disabled={isLoadingQueries || isLoading}
-                        >
-                            <option value="">-- Select a Query ({queries.length} available) --</option>
-                            {queries.map(q => (
-                                <option key={q.id} value={q.id}>
-                                    {q.path}
-                                </option>
-                            ))}
-                        </select>
+                        <label>Select Query:</label>
+                        <QuerySelector
+                            queries={queries}
+                            selectedQueryId={selectedQueryId}
+                            onQuerySelect={(id) => {
+                                setSelectedQueryId(id);
+                                if (id) executeQuery(id);
+                            }}
+                            disabled={isLoading}
+                            isLoading={isLoadingQueries}
+                        />
                     </div>
-
-                    {/* Load All Button */}
-                    <button
-                        className="hub-btn hub-btn-primary"
-                        onClick={loadAllHierarchical}
-                        disabled={isLoading}
-                    >
-                        {useMockData ? 'Load Sample Data' : 'Load All Work Items'}
-                    </button>
                 </div>
             </div>
 

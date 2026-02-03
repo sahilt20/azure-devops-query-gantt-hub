@@ -21,36 +21,47 @@ interface IGanttTimelineProps {
 export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config }) => {
     const { startDate, endDate, viewMode } = config;
 
-    // Generate dates for the timeline
+    // Generate dates based on view mode
     const dates = useMemo(() => {
-        return generateDateRange(startDate, endDate, 'day');
-    }, [startDate, endDate]);
+        return generateDateRange(startDate, endDate, viewMode);
+    }, [startDate, endDate, viewMode]);
 
-    // Group dates by month for header
-    const months = useMemo(() => {
-        const monthMap = new Map<string, { name: string; days: number; startIndex: number }>();
-
-        dates.forEach((date, index) => {
-            const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-            const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
-            if (!monthMap.has(monthKey)) {
-                monthMap.set(monthKey, { name: monthName, days: 1, startIndex: index });
-            } else {
-                const month = monthMap.get(monthKey)!;
-                month.days++;
-            }
-        });
-
-        return Array.from(monthMap.values());
-    }, [dates]);
+    // Group dates by month/year for header row
+    const headerGroups = useMemo(() => {
+        if (viewMode === 'month') {
+            // For month view, group by year
+            const yearMap = new Map<number, { name: string; count: number }>();
+            dates.forEach(date => {
+                const year = date.getFullYear();
+                if (!yearMap.has(year)) {
+                    yearMap.set(year, { name: year.toString(), count: 1 });
+                } else {
+                    yearMap.get(year)!.count++;
+                }
+            });
+            return Array.from(yearMap.values());
+        } else {
+            // For day/week view, group by month
+            const monthMap = new Map<string, { name: string; count: number }>();
+            dates.forEach(date => {
+                const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+                const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                if (!monthMap.has(monthKey)) {
+                    monthMap.set(monthKey, { name: monthName, count: 1 });
+                } else {
+                    monthMap.get(monthKey)!.count++;
+                }
+            });
+            return Array.from(monthMap.values());
+        }
+    }, [dates, viewMode]);
 
     // Calculate column width based on view mode
     const getColumnWidth = (): number => {
         switch (viewMode) {
             case 'day': return 30;
-            case 'week': return 100;
-            case 'month': return 150;
+            case 'week': return 80;
+            case 'month': return 100;
             default: return 30;
         }
     };
@@ -58,8 +69,8 @@ export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config }) => {
     const columnWidth = getColumnWidth();
     const totalWidth = dates.length * columnWidth;
 
-    // Get display label for a date based on view mode
-    const getDayLabel = (date: Date): string => {
+    // Get display label for each column based on view mode
+    const getColumnLabel = (date: Date): string => {
         switch (viewMode) {
             case 'day':
                 return date.getDate().toString();
@@ -72,45 +83,58 @@ export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config }) => {
         }
     };
 
-    // Get week number
+    // Get week number (ISO week)
     const getWeekNumber = (date: Date): number => {
-        const start = new Date(date.getFullYear(), 0, 1);
-        const diff = date.getTime() - start.getTime();
-        const oneWeek = 604800000;
-        return Math.ceil(diff / oneWeek);
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
     };
 
-    // Check if date is today
+    // Check if date column represents today
     const isToday = (date: Date): boolean => {
         const today = new Date();
-        return date.toDateString() === today.toDateString();
+        switch (viewMode) {
+            case 'day':
+                return date.toDateString() === today.toDateString();
+            case 'week':
+                const weekStart = new Date(date);
+                const weekEnd = new Date(date);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                return today >= weekStart && today <= weekEnd;
+            case 'month':
+                return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+            default:
+                return false;
+        }
     };
 
     return (
         <div className="gantt-timeline-header" style={{ width: totalWidth }}>
-            {/* Month row */}
+            {/* Header row (Year for month view, Month for day/week view) */}
             <div className="gantt-timeline-months">
-                {months.map((month, index) => (
+                {headerGroups.map((group, index) => (
                     <div
                         key={index}
                         className="gantt-timeline-month"
-                        style={{ width: month.days * columnWidth }}
+                        style={{ width: group.count * columnWidth }}
                     >
-                        {month.name}
+                        {group.name}
                     </div>
                 ))}
             </div>
 
-            {/* Days row */}
+            {/* Date columns row */}
             <div className="gantt-timeline-days">
                 {dates.map((date, index) => (
                     <div
                         key={index}
-                        className={`gantt-timeline-day ${isWeekend(date) ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}`}
+                        className={`gantt-timeline-day ${viewMode === 'day' && isWeekend(date) ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}`}
                         style={{ width: columnWidth }}
                         title={formatShortDate(date)}
                     >
-                        {getDayLabel(date)}
+                        {getColumnLabel(date)}
                     </div>
                 ))}
             </div>

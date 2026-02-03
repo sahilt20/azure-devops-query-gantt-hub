@@ -20,6 +20,7 @@ import { GanttRow } from './GanttRow';
 import { GanttBar } from './GanttBar';
 import { GanttTimeline } from './GanttTimeline';
 import { DateRangePicker } from './DateRangePicker';
+import { FieldConfigModal } from '../FieldConfig/FieldConfigModal';
 import './GanttChart.css';
 
 interface IGanttChartProps {
@@ -48,6 +49,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
     const [customDateRange, setCustomDateRange] = useState<{ start: Date; end: Date } | null>(null);
     const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
     const [resizing, setResizing] = useState<{ column: string; startX: number; startWidth: number } | null>(null);
+    const [showFieldConfig, setShowFieldConfig] = useState(false);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
@@ -123,7 +125,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         showWeekends: true,
         rowHeight: 44,
         headerHeight: 70,
-        columnWidth: viewMode === 'day' ? 30 : viewMode === 'week' ? 100 : 150
+        columnWidth: viewMode === 'day' ? 30 : viewMode === 'week' ? 80 : 100
     }), [dateRange, viewMode]);
 
     // Stats
@@ -217,11 +219,27 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         return { startPercent, widthPercent: endPercent - startPercent };
     };
 
-    // Timeline width
+    // Timeline width - calculate based on view mode
     const timelineWidth = useMemo(() => {
         const days = diffInDays(dateRange.start, dateRange.end);
-        return days * ganttConfig.columnWidth;
-    }, [dateRange, ganttConfig.columnWidth]);
+        let columnCount: number;
+
+        switch (viewMode) {
+            case 'week':
+                columnCount = Math.ceil(days / 7);
+                break;
+            case 'month':
+                // Calculate number of months
+                const startMonth = dateRange.start.getFullYear() * 12 + dateRange.start.getMonth();
+                const endMonth = dateRange.end.getFullYear() * 12 + dateRange.end.getMonth();
+                columnCount = endMonth - startMonth + 1;
+                break;
+            default:
+                columnCount = days;
+        }
+
+        return columnCount * ganttConfig.columnWidth;
+    }, [dateRange, ganttConfig.columnWidth, viewMode]);
 
     // Today position
     const todayPosition = useMemo(() => {
@@ -286,6 +304,14 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </div>
                 </div>
                 <div className="gantt-toolbar-right">
+                    <button
+                        className="gantt-btn gantt-btn-settings"
+                        onClick={() => setShowFieldConfig(true)}
+                        title="Configure Fields"
+                        style={{ marginRight: 8 }}
+                    >
+                        ⚙️
+                    </button>
                     <button
                         className="gantt-btn gantt-btn-refresh"
                         onClick={onRefresh}
@@ -392,6 +418,16 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Field Configuration Modal */}
+            <FieldConfigModal
+                isOpen={showFieldConfig}
+                onClose={() => setShowFieldConfig(false)}
+                onSave={() => {
+                    // Trigger refresh to recalculate with new fields
+                    if (onRefresh) onRefresh();
+                }}
+            />
         </div>
     );
 };

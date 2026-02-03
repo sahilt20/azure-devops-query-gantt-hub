@@ -388,6 +388,47 @@ class AzureDevOpsService {
             throw error;
         }
     }
+
+    // Get all work item fields (for field configuration)
+    async getWorkItemFields(): Promise<{ referenceName: string; name: string; type: string; isNumeric: boolean }[]> {
+        if (!this.baseUrl || !this.projectName) {
+            console.warn('[AzureDevOpsService] Not initialized for getWorkItemFields');
+            return this.getDefaultNumericFields();
+        }
+
+        try {
+            const url = `${this.baseUrl}/${this.projectName}/_apis/wit/fields?api-version=7.0`;
+            const response = await this.makeApiRequest<{ value: any[] }>(url);
+
+            const numericTypes = ['integer', 'double', 'treepath', 'plaintext'];
+
+            return response.value
+                .filter((field: any) => numericTypes.includes(field.type?.toLowerCase()))
+                .map((field: any) => ({
+                    referenceName: field.referenceName,
+                    name: field.name,
+                    type: field.type,
+                    isNumeric: ['integer', 'double'].includes(field.type?.toLowerCase())
+                }))
+                .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        } catch (error) {
+            console.error('[AzureDevOpsService] Error fetching fields:', error);
+            return this.getDefaultNumericFields();
+        }
+    }
+
+    // Default numeric fields if API call fails
+    private getDefaultNumericFields(): { referenceName: string; name: string; type: string; isNumeric: boolean }[] {
+        return [
+            { referenceName: 'Microsoft.VSTS.Scheduling.OriginalEstimate', name: 'Original Estimate', type: 'double', isNumeric: true },
+            { referenceName: 'Microsoft.VSTS.Scheduling.RemainingWork', name: 'Remaining Work', type: 'double', isNumeric: true },
+            { referenceName: 'Microsoft.VSTS.Scheduling.CompletedWork', name: 'Completed Work', type: 'double', isNumeric: true },
+            { referenceName: 'Microsoft.VSTS.Scheduling.Effort', name: 'Effort', type: 'double', isNumeric: true },
+            { referenceName: 'Microsoft.VSTS.Scheduling.StoryPoints', name: 'Story Points', type: 'double', isNumeric: true },
+            { referenceName: 'Microsoft.VSTS.Common.Priority', name: 'Priority', type: 'integer', isNumeric: true },
+            { referenceName: 'Microsoft.VSTS.Common.StackRank', name: 'Stack Rank', type: 'double', isNumeric: true }
+        ];
+    }
 }
 
 export const azureDevOpsService = AzureDevOpsService.getInstance();
