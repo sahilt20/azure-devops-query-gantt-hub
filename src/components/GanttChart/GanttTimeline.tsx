@@ -8,9 +8,7 @@ import {
     generateDateRange,
     formatShortDate,
     isWeekend,
-    addDays,
-    startOfMonth,
-    diffInDays
+    getColumnWidth
 } from '../../utils/DateUtils';
 import { IGanttConfig } from '../../models/WorkItemModels';
 
@@ -56,17 +54,7 @@ export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config }) => {
         }
     }, [dates, viewMode]);
 
-    // Calculate column width based on view mode
-    const getColumnWidth = (): number => {
-        switch (viewMode) {
-            case 'day': return 30;
-            case 'week': return 80;
-            case 'month': return 100;
-            default: return 30;
-        }
-    };
-
-    const columnWidth = getColumnWidth();
+    const columnWidth = getColumnWidth(viewMode);
     const totalWidth = dates.length * columnWidth;
 
     // Get display label for each column based on view mode

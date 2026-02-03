@@ -245,20 +245,9 @@ export const QueryGanttHub: React.FC = () => {
                     </h1>
                     <span className="hub-subtitle">
                         Visualize work items from Epic → Feature → PBI → Task with effort rollup
-                        {useMockData && <span className="mock-badge"> (Sample Data)</span>}
                     </span>
                 </div>
                 <div className="hub-header-right">
-                    {/* Mock Data Toggle - only in dev mode */}
-                    {isDevelopment && (
-                        <button
-                            className={`hub-btn ${useMockData ? 'hub-btn-active' : 'hub-btn-secondary'}`}
-                            onClick={toggleMockData}
-                        >
-                            {useMockData ? '🎭 Using Sample Data' : '🔗 Connect to Azure'}
-                        </button>
-                    )}
-
                     {/* Query Selector */}
                     <div className="query-selector">
                         <label>Select Query:</label>

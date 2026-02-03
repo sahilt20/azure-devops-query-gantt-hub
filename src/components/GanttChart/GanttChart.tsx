@@ -13,8 +13,9 @@ import {
     minDate,
     maxDate,
     addDays,
-    diffInDays,
-    getDatePositionPercent
+    getDatePositionPercent,
+    getTimelineWidth,
+    getColumnWidth
 } from '../../utils/DateUtils';
 import { GanttRow } from './GanttRow';
 import { GanttBar } from './GanttBar';
@@ -125,7 +126,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         showWeekends: true,
         rowHeight: 44,
         headerHeight: 70,
-        columnWidth: viewMode === 'day' ? 30 : viewMode === 'week' ? 80 : 100
+        columnWidth: getColumnWidth(viewMode)
     }), [dateRange, viewMode]);
 
     // Stats
@@ -219,27 +220,10 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         return { startPercent, widthPercent: endPercent - startPercent };
     };
 
-    // Timeline width - calculate based on view mode
+    // Timeline width - use centralized function for consistency with GanttTimeline
     const timelineWidth = useMemo(() => {
-        const days = diffInDays(dateRange.start, dateRange.end);
-        let columnCount: number;
-
-        switch (viewMode) {
-            case 'week':
-                columnCount = Math.ceil(days / 7);
-                break;
-            case 'month':
-                // Calculate number of months
-                const startMonth = dateRange.start.getFullYear() * 12 + dateRange.start.getMonth();
-                const endMonth = dateRange.end.getFullYear() * 12 + dateRange.end.getMonth();
-                columnCount = endMonth - startMonth + 1;
-                break;
-            default:
-                columnCount = days;
-        }
-
-        return columnCount * ganttConfig.columnWidth;
-    }, [dateRange, ganttConfig.columnWidth, viewMode]);
+        return getTimelineWidth(dateRange.start, dateRange.end, viewMode);
+    }, [dateRange, viewMode]);
 
     // Today position
     const todayPosition = useMemo(() => {
@@ -308,7 +292,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                         className="gantt-btn gantt-btn-settings"
                         onClick={() => setShowFieldConfig(true)}
                         title="Configure Fields"
-                        style={{ marginRight: 8 }}
                     >
                         ⚙️
                     </button>
@@ -316,7 +299,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                         className="gantt-btn gantt-btn-refresh"
                         onClick={onRefresh}
                         title="Refresh Data"
-                        style={{ marginRight: 8 }}
                     >
                         🔄
                     </button>

@@ -136,6 +136,15 @@
     color: #fff;
 }
 
+.field-config-calculated {
+    padding: 12px 16px;
+    background: rgba(74, 158, 255, 0.1);
+    border: 1px solid rgba(74, 158, 255, 0.3);
+    border-radius: 8px;
+    color: #4a9eff;
+    font-size: 13px;
+}
+
 .field-config-footer {
     display: flex;
     justify-content: space-between;

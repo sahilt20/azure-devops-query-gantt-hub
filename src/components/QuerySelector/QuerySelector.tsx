@@ -1,6 +1,7 @@
 /**
  * Query Selector Component
- * Enhanced dropdown with search, folder grouping, and favorites
+ * Enhanced dropdown with search and folder grouping
+ * Shows Azure DevOps query folders: My Queries, Shared Queries
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -15,8 +16,6 @@ interface IQuerySelectorProps {
     isLoading?: boolean;
 }
 
-const FAVORITES_STORAGE_KEY = 'gantt-favorite-queries';
-
 export const QuerySelector: React.FC<IQuerySelectorProps> = ({
     queries,
     selectedQueryId,
@@ -26,21 +25,8 @@ export const QuerySelector: React.FC<IQuerySelectorProps> = ({
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [favorites, setFavorites] = useState<string[]>([]);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    // Load favorites from localStorage
-    useEffect(() => {
-        try {
-            const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
-            if (stored) {
-                setFavorites(JSON.parse(stored));
-            }
-        } catch (e) {
-            console.warn('Failed to load favorites:', e);
-        }
-    }, []);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -61,23 +47,8 @@ export const QuerySelector: React.FC<IQuerySelectorProps> = ({
         }
     }, [isOpen]);
 
-    // Toggle favorite status
-    const toggleFavorite = (queryId: string, event: React.MouseEvent) => {
-        event.stopPropagation();
-        const newFavorites = favorites.includes(queryId)
-            ? favorites.filter(id => id !== queryId)
-            : [...favorites, queryId];
-
-        setFavorites(newFavorites);
-        try {
-            localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(newFavorites));
-        } catch (e) {
-            console.warn('Failed to save favorites:', e);
-        }
-    };
-
-    // Filter and group queries
-    const { favoriteQueries, folderGroups } = useMemo(() => {
+    // Filter and group queries by Azure DevOps folders
+    const folderGroups = useMemo(() => {
         const searchLower = searchTerm.toLowerCase().trim();
 
         // Filter by search term
@@ -88,25 +59,33 @@ export const QuerySelector: React.FC<IQuerySelectorProps> = ({
             )
             : queries;
 
-        // Separate favorites
-        const favQueries = filtered.filter(q => favorites.includes(q.id));
-
-        // Group by folder
+        // Group by top-level folder (My Queries, Shared Queries, etc.)
         const groups = new Map<string, IQueryInfo[]>();
+
         filtered.forEach(q => {
             const parts = q.path.split('/');
-            const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : 'Root';
-            if (!groups.has(folder)) {
-                groups.set(folder, []);
+            // First part is the root folder (My Queries, Shared Queries)
+            const rootFolder = parts[0] || 'Other';
+
+            if (!groups.has(rootFolder)) {
+                groups.set(rootFolder, []);
             }
-            groups.get(folder)!.push(q);
+            groups.get(rootFolder)!.push(q);
         });
 
-        return {
-            favoriteQueries: favQueries,
-            folderGroups: Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-        };
-    }, [queries, searchTerm, favorites]);
+        // Sort folders with "My Queries" first, then "Shared Queries", then others
+        const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
+            const aLower = a[0].toLowerCase();
+            const bLower = b[0].toLowerCase();
+            if (aLower.includes('my')) return -1;
+            if (bLower.includes('my')) return 1;
+            if (aLower.includes('shared')) return -1;
+            if (bLower.includes('shared')) return 1;
+            return a[0].localeCompare(b[0]);
+        });
+
+        return sortedGroups;
+    }, [queries, searchTerm]);
 
     // Get selected query name
     const selectedQuery = queries.find(q => q.id === selectedQueryId);
@@ -118,6 +97,15 @@ export const QuerySelector: React.FC<IQuerySelectorProps> = ({
         onQuerySelect(queryId);
         setIsOpen(false);
         setSearchTerm('');
+    };
+
+    // Get folder icon based on folder name
+    const getFolderIcon = (folderName: string): string => {
+        const lower = folderName.toLowerCase();
+        if (lower.includes('my')) return '👤';
+        if (lower.includes('shared')) return '👥';
+        if (lower.includes('favorite')) return '⭐';
+        return '📁';
     };
 
     return (
@@ -149,59 +137,34 @@ export const QuerySelector: React.FC<IQuerySelectorProps> = ({
                             <div className="query-selector-loading">Loading queries...</div>
                         ) : (
                             <>
-                                {/* Favorites Section */}
-                                {favoriteQueries.length > 0 && (
-                                    <div className="query-selector-section">
-                                        <div className="query-selector-section-header">
-                                            ⭐ Favorites
-                                        </div>
-                                        {favoriteQueries.map(query => (
-                                            <div
-                                                key={query.id}
-                                                className={`query-selector-item ${query.id === selectedQueryId ? 'selected' : ''}`}
-                                                onClick={() => handleSelect(query.id)}
-                                            >
-                                                <span className="query-item-name">{query.name}</span>
-                                                <button
-                                                    className="query-item-favorite active"
-                                                    onClick={(e) => toggleFavorite(query.id, e)}
-                                                    title="Remove from favorites"
-                                                >
-                                                    ⭐
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* All Queries by Folder */}
+                                {/* Query Folders */}
                                 {folderGroups.map(([folder, groupQueries]) => (
                                     <div key={folder} className="query-selector-section">
                                         <div className="query-selector-section-header">
-                                            📁 {folder}
+                                            {getFolderIcon(folder)} {folder}
                                         </div>
                                         {groupQueries.map(query => (
                                             <div
                                                 key={query.id}
                                                 className={`query-selector-item ${query.id === selectedQueryId ? 'selected' : ''}`}
                                                 onClick={() => handleSelect(query.id)}
+                                                title={query.path}
                                             >
                                                 <span className="query-item-name">{query.name}</span>
-                                                <button
-                                                    className={`query-item-favorite ${favorites.includes(query.id) ? 'active' : ''}`}
-                                                    onClick={(e) => toggleFavorite(query.id, e)}
-                                                    title={favorites.includes(query.id) ? 'Remove from favorites' : 'Add to favorites'}
-                                                >
-                                                    {favorites.includes(query.id) ? '⭐' : '☆'}
-                                                </button>
+                                                <span className="query-item-type">
+                                                    {query.queryType === 'tree' ? '🌳' : query.queryType === 'oneHop' ? '↔️' : '📋'}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
                                 ))}
 
-                                {folderGroups.length === 0 && favoriteQueries.length === 0 && (
+                                {folderGroups.length === 0 && (
                                     <div className="query-selector-empty">
-                                        No queries found matching "{searchTerm}"
+                                        {searchTerm
+                                            ? `No queries found matching "${searchTerm}"`
+                                            : 'No queries available'
+                                        }
                                     </div>
                                 )}
                             </>

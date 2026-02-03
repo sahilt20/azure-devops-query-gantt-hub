@@ -225,6 +225,8 @@
 .gantt-scroll-content {
     display: flex;
     min-height: min-content;
+    width: max-content;
+    /* Allow content to determine width */
 }
 
 /* Table Body */
@@ -305,10 +307,13 @@
 
 /* Timeline Body */
 .gantt-timeline-body {
-    flex: 1;
+    flex: 0 0 auto;
+    /* Don't grow or shrink - respect the set width */
     overflow-x: auto;
     overflow-y: scroll;
     position: relative;
+    min-width: 0;
+    /* Allow proper scrolling */
 }
 
 /* Hide vertical scrollbar on timeline - table scrollbar is the primary one */

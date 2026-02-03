@@ -4,24 +4,28 @@ A custom Azure DevOps extension that adds a **Gantt Chart** hub to visualize wor
 
 ## Screenshots
 
-### Gantt Chart with Sample Data
-![Gantt Chart with Data](docs/screenshots/gantt-with-data.png)
+### Query Selector with Folder Grouping
+![Query Selector](images/query-selector.png)
 
-### Expanded Hierarchy View
-![Expanded View](docs/screenshots/gantt-expanded.png)
+### Gantt Chart - Day View
+![Day View](images/gantt-day-view.png)
 
-### Week View Mode
-![Week View](docs/screenshots/gantt-week-view.png)
+### Gantt Chart - Month View
+![Month View](images/gantt-month-view.png)
+
+### Field Configuration
+![Field Config](images/field-config.png)
 
 ## Features
 
 - 📊 **Gantt Chart Visualization** - View work items on a timeline with progress bars
 - 🔄 **Effort Rollup** - Automatically calculates effort from Task level up
-- 📈 **Percent Complete** - Shows completion percentage at each level
+- 📈 **Auto-Calculated Done %** - Automatically computed from Effort and Remaining Work
 - 🌳 **Hierarchical View** - Collapsible tree structure (Epic → Feature → PBI → Task)
-- 🔍 **Query Integration** - Execute any Azure DevOps query and visualize results
+- 🔍 **Enhanced Query Selector** - Search queries with folder grouping (My Queries/Shared Queries)
 - 🎨 **Modern UI** - Dark theme with smooth animations and glassmorphism effects
-- 📅 **Multiple View Modes** - Day, Week, and Month timeline views
+- 📅 **Multiple View Modes** - Day, Week, and Month timeline views with dynamic scaling
+- ⚙️ **Configurable Fields** - Choose which fields to use for effort calculations
 
 ## Work Item Hierarchy
 
@@ -34,9 +38,9 @@ Epic (Level 0)
 
 ## Effort Rollup Logic
 
-- **Tasks**: Use `Original Estimate`, `Remaining Work`, and `Completed Work` fields
+- **Tasks**: Use configurable fields (default: `Original Estimate`, `Remaining Work`)
 - **Parent Items**: Sum of all descendant effort values
-- **Percent Complete**: `(Completed Work / Total Effort) × 100`
+- **Done %**: Automatically calculated as `100 - (Remaining Work / Effort × 100)`
 
 ## Installation
 
@@ -69,7 +73,7 @@ This creates a `.vsix` file that can be uploaded to the Azure DevOps Marketplace
 npm run start:dev
 ```
 
-The dev server runs at `https://localhost:3001`. The extension automatically uses sample data when running locally.
+The dev server runs at `https://localhost:3001`.
 
 ## Configuration
 
@@ -83,6 +87,13 @@ Edit `vss-extension.json` and replace `your-publisher-id` with your Azure DevOps
 }
 ```
 
+### Field Configuration
+
+Click the ⚙️ button in the Gantt chart toolbar to configure:
+- **Effort Field** - Field used for planned/estimated work
+- **Remaining Work Field** - Field used for remaining hours
+- **Done %** - Automatically calculated from Effort and Remaining fields
+
 ### Required Scopes
 
 The extension requires the following Azure DevOps scopes:
@@ -92,7 +103,7 @@ The extension requires the following Azure DevOps scopes:
 
 1. Navigate to **Azure Boards** in your Azure DevOps project
 2. Click on **Query Gantt Chart** in the hub navigation
-3. Select a query from the dropdown or click **Load All Work Items**
+3. Select a query from the enhanced dropdown (supports search and folder grouping)
 4. The Gantt chart displays with:
    - Work item hierarchy on the left
    - Timeline with progress bars on the right
@@ -100,11 +111,13 @@ The extension requires the following Azure DevOps scopes:
 
 ### Toolbar Controls
 
-| Control            | Description                |
-| ------------------ | -------------------------- |
-| **Day/Week/Month** | Switch timeline view modes |
-| **Expand All**     | Expand entire hierarchy    |
-| **Collapse All**   | Collapse to top level      |
+| Control            | Description                   |
+| ------------------ | ----------------------------- |
+| **Day/Week/Month** | Switch timeline view modes    |
+| **⚙️ Settings**     | Configure effort fields       |
+| **🔄 Refresh**      | Reload data from Azure DevOps |
+| **Expand All**     | Expand entire hierarchy       |
+| **Collapse All**   | Collapse to top level         |
 
 ## Project Structure
 
@@ -118,6 +131,12 @@ azure-devops-query-ui-hub/
 │   │   │   ├── GanttBar.tsx       # Progress bar
 │   │   │   ├── GanttTimeline.tsx  # Timeline header
 │   │   │   └── GanttChart.css     # Styles
+│   │   ├── QuerySelector/
+│   │   │   ├── QuerySelector.tsx  # Enhanced query dropdown
+│   │   │   └── QuerySelector.css  # Dropdown styles
+│   │   ├── FieldConfig/
+│   │   │   ├── FieldConfigModal.tsx  # Field settings modal
+│   │   │   └── FieldConfigModal.css  # Modal styles
 │   │   └── QueryGanttHub/
 │   │       ├── QueryGanttHub.tsx  # Main hub component
 │   │       └── QueryGanttHub.css  # Hub styles
@@ -125,6 +144,7 @@ azure-devops-query-ui-hub/
 │   │   ├── AzureDevOpsService.ts     # API integration
 │   │   ├── WorkItemHierarchyService.ts # Hierarchy building
 │   │   ├── EffortRollupService.ts    # Effort calculations
+│   │   ├── FieldConfigService.ts     # Field configuration
 │   │   └── MockDataService.ts        # Sample data for testing
 │   ├── models/
 │   │   └── WorkItemModels.ts      # TypeScript interfaces
@@ -132,8 +152,7 @@ azure-devops-query-ui-hub/
 │   │   └── DateUtils.ts           # Date helpers
 │   ├── QueryGanttHub.tsx          # Entry point
 │   └── QueryGanttHub.html         # HTML template
-├── docs/
-│   └── screenshots/               # UI screenshots
+├── images/                        # README screenshots
 ├── static/
 │   └── images/
 │       └── gantt-icon.png         # Extension icon
@@ -143,6 +162,24 @@ azure-devops-query-ui-hub/
 └── webpack.config.js
 ```
 
+## Version History
+
+### v1.2.1 (Latest)
+- ✅ Auto-calculated Done % from Effort and Remaining fields
+- ✅ Timeline properly scales when switching Day/Week/Month views
+- ✅ Enhanced query selector with solid background and folder grouping
+- ✅ Removed sample data toggle button
+- ✅ Improved toolbar spacing
+
+### v1.2.0
+- Added configurable field mappings
+- Enhanced query selector with search and favorites
+- Fixed week/month timeline views
+
+### v1.1.x
+- Query integration improvements
+- UI enhancements
+- Bug fixes
 
 ## Troubleshooting & Known Issues
 

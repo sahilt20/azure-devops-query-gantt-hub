@@ -248,3 +248,31 @@ export function hoursToWorkingDays(hours: number): number {
     const HOURS_PER_DAY = 7;
     return Math.ceil(hours / HOURS_PER_DAY);
 }
+
+/**
+ * Calculate the number of columns for timeline based on view mode
+ * This ensures consistent width between GanttTimeline and GanttChart
+ */
+export function getTimelineColumnCount(start: Date | string, end: Date | string, viewMode: 'day' | 'week' | 'month'): number {
+    const dates = generateDateRange(start, end, viewMode);
+    return dates.length;
+}
+
+/**
+ * Get the column width for a given view mode
+ */
+export function getColumnWidth(viewMode: 'day' | 'week' | 'month'): number {
+    switch (viewMode) {
+        case 'day': return 30;
+        case 'week': return 80;
+        case 'month': return 100;
+        default: return 30;
+    }
+}
+
+/**
+ * Calculate total timeline width
+ */
+export function getTimelineWidth(start: Date | string, end: Date | string, viewMode: 'day' | 'week' | 'month'): number {
+    return getTimelineColumnCount(start, end, viewMode) * getColumnWidth(viewMode);
+}

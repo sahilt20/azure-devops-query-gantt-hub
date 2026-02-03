@@ -112,22 +112,13 @@ export const FieldConfigModal: React.FC<IFieldConfigModalProps> = ({ isOpen, onC
                             </div>
 
                             <div className="field-config-row">
-                                <label htmlFor="done-field">
+                                <label>
                                     <span className="field-label">Done %</span>
-                                    <span className="field-hint">Field for completion percentage, or auto-calculate</span>
+                                    <span className="field-hint">Automatically calculated from Effort and Remaining</span>
                                 </label>
-                                <select
-                                    id="done-field"
-                                    value={config.doneField}
-                                    onChange={e => handleFieldChange('doneField', e.target.value)}
-                                >
-                                    <option value="calculated">🔢 Calculated (100 - Remaining/Effort * 100)</option>
-                                    {fields.map(field => (
-                                        <option key={field.referenceName} value={field.referenceName}>
-                                            {field.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="field-config-calculated">
+                                    🔢 <strong>Auto-Calculated:</strong> 100 - (Remaining ÷ Effort × 100)
+                                </div>
                             </div>
                         </div>
                     )}
