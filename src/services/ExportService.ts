@@ -1,12 +1,13 @@
 /**
  * Export Service
  * Provides functionality to export Gantt chart data to Excel format
- * Includes well-formatted table and full screenshot of Gantt chart
+ * Creates proper Excel file with formatted table + separate PNG screenshot
  */
 
 import { IWorkItemNode } from '../models/WorkItemModels';
-import { formatShortDate, addDays, diffInDays } from '../utils/DateUtils';
+import { formatShortDate } from '../utils/DateUtils';
 import html2canvas from 'html2canvas';
+import * as XLSX from 'xlsx';
 
 class ExportService {
     private static instance: ExportService;
@@ -21,7 +22,7 @@ class ExportService {
     }
 
     /**
-     * Export to Excel with formatted table and full Gantt chart screenshot
+     * Export to Excel with formatted table + separate PNG screenshot
      */
     public async exportToExcelWithScreenshot(
         workItems: IWorkItemNode[],
@@ -30,262 +31,234 @@ class ExportService {
     ): Promise<void> {
         const flatItems = this.flattenHierarchy(workItems);
 
-        // Capture full Gantt chart screenshot
-        let screenshotDataUrl: string | null = null;
+        // Create Excel workbook with formatted data
+        this.exportToExcel(flatItems, filename);
+
+        // Capture and download Gantt chart screenshot separately
         if (ganttElement) {
-            screenshotDataUrl = await this.captureFullGanttScreenshot(ganttElement);
+            await this.captureAndDownloadScreenshot(ganttElement, `${filename}-chart`);
         }
-
-        // Generate Excel HTML
-        const excelHtml = this.generateExcelHtml(flatItems, screenshotDataUrl);
-
-        // Download as .xls (Excel will open HTML files)
-        const blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel' });
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${filename}.xls`;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        setTimeout(() => URL.revokeObjectURL(url), 100);
     }
 
     /**
-     * Capture full screenshot of Gantt chart (including off-screen content)
+     * Create and download proper Excel file with formatted data
      */
-    private async captureFullGanttScreenshot(element: HTMLElement): Promise<string | null> {
+    private exportToExcel(items: IWorkItemNode[], filename: string): void {
+        // Calculate summary stats
+        const stats = this.calculateStats(items);
+
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Summary
+        const summaryData = [
+            ['📊 Gantt Chart Export Summary'],
+            [''],
+            ['Metric', 'Value'],
+            ['Total Work Items', items.length],
+            ['Total Effort (hours)', stats.totalEffort],
+            ['Remaining Work (hours)', stats.totalRemaining],
+            ['Completed Work (hours)', stats.totalCompleted],
+            ['Overall Progress', `${stats.overallProgress}%`],
+            ['Export Date', new Date().toLocaleDateString()]
+        ];
+
+        const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+
+        // Set column widths for summary
+        summarySheet['!cols'] = [{ wch: 25 }, { wch: 20 }];
+
+        XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+
+        // Sheet 2: Work Items Detail
+        const headers = [
+            'ID',
+            'Level',
+            'Type',
+            'Title',
+            'State',
+            'Assigned To',
+            'Start Date',
+            'End Date',
+            'Effort (h)',
+            'Remaining (h)',
+            'Done %'
+        ];
+
+        const rows: (string | number)[][] = [headers];
+
+        for (const item of items) {
+            const indent = '  '.repeat(item.level);
+            rows.push([
+                item.id,
+                item.level,
+                item.workItemType,
+                indent + item.title,
+                item.state,
+                item.assignedTo,
+                item.calculatedStartDate ? formatShortDate(item.calculatedStartDate) : '',
+                item.calculatedEndDate ? formatShortDate(item.calculatedEndDate) : '',
+                item.rollupEffort || 0,
+                item.rollupRemainingWork || 0,
+                item.percentComplete
+            ]);
+        }
+
+        const detailSheet = XLSX.utils.aoa_to_sheet(rows);
+
+        // Set column widths
+        detailSheet['!cols'] = [
+            { wch: 8 },   // ID
+            { wch: 6 },   // Level
+            { wch: 20 },  // Type
+            { wch: 50 },  // Title
+            { wch: 12 },  // State
+            { wch: 20 },  // Assigned To
+            { wch: 12 },  // Start Date
+            { wch: 12 },  // End Date
+            { wch: 10 },  // Effort
+            { wch: 12 },  // Remaining
+            { wch: 8 }    // Done %
+        ];
+
+        XLSX.utils.book_append_sheet(wb, detailSheet, 'Work Items');
+
+        // Sheet 3: By Type Summary
+        const typeStats = this.getStatsByType(items);
+        const typeData: (string | number)[][] = [
+            ['Work Item Type', 'Count', 'Total Effort (h)', 'Remaining (h)', 'Avg Progress']
+        ];
+
+        for (const [type, stats] of Object.entries(typeStats)) {
+            typeData.push([
+                type,
+                stats.count,
+                Math.round(stats.effort * 10) / 10,
+                Math.round(stats.remaining * 10) / 10,
+                `${Math.round(stats.avgProgress)}%`
+            ]);
+        }
+
+        const typeSheet = XLSX.utils.aoa_to_sheet(typeData);
+        typeSheet['!cols'] = [
+            { wch: 25 }, { wch: 10 }, { wch: 18 }, { wch: 15 }, { wch: 15 }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, typeSheet, 'By Type');
+
+        // Generate Excel file and download
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+        this.downloadBlob(blob, `${filename}.xlsx`);
+    }
+
+    /**
+     * Capture full Gantt screenshot (including all scrollable content) and download as PNG
+     */
+    private async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
         try {
-            // Find the scroll container and timeline body
-            const scrollContainer = element.querySelector('.gantt-scroll-container') as HTMLElement || element;
-            const timelineBody = element.querySelector('.gantt-timeline-body') as HTMLElement;
+            // Find the scroll container and content
+            const scrollContainer = element.closest('.gantt-scroll-container') as HTMLElement;
+            const ganttContent = element;
 
-            // Store original dimensions
-            const originalScrollLeft = scrollContainer.scrollLeft;
-            const originalScrollTop = scrollContainer.scrollTop;
-            const originalWidth = element.style.width;
-            const originalHeight = element.style.height;
-            const originalOverflow = element.style.overflow;
-
-            // Temporarily expand to show full content
-            if (timelineBody) {
-                const fullWidth = Math.max(timelineBody.scrollWidth, scrollContainer.scrollWidth);
-                const fullHeight = Math.max(element.scrollHeight, 800);
-                element.style.overflow = 'visible';
-                element.style.width = fullWidth + 'px';
-                element.style.height = fullHeight + 'px';
+            if (!scrollContainer) {
+                console.warn('Could not find scroll container');
+                return;
             }
+
+            // Store original styles and scroll positions
+            const originalStyles = {
+                scrollContainerHeight: scrollContainer.style.height,
+                scrollContainerMaxHeight: scrollContainer.style.maxHeight,
+                scrollContainerOverflow: scrollContainer.style.overflow,
+                elementWidth: ganttContent.style.width,
+                elementHeight: ganttContent.style.height,
+                scrollLeft: scrollContainer.scrollLeft,
+                scrollTop: scrollContainer.scrollTop
+            };
+
+            // Calculate full content dimensions
+            const fullWidth = Math.max(ganttContent.scrollWidth, scrollContainer.scrollWidth, 1200);
+            const fullHeight = Math.max(ganttContent.scrollHeight, scrollContainer.scrollHeight, 600);
+
+            // Temporarily expand the container to show ALL content
+            scrollContainer.style.height = `${fullHeight + 50}px`;
+            scrollContainer.style.maxHeight = 'none';
+            scrollContainer.style.overflow = 'visible';
+            ganttContent.style.width = `${fullWidth}px`;
+            ganttContent.style.height = `${fullHeight}px`;
 
             // Scroll to beginning
             scrollContainer.scrollLeft = 0;
             scrollContainer.scrollTop = 0;
 
-            // Wait for repaint
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Wait for layout to update
+            await new Promise(resolve => setTimeout(resolve, 300));
 
-            // Capture the full element
-            const canvas = await html2canvas(element, {
-                scale: 1.5, // Higher quality
+            // Capture the FULL content
+            const canvas = await html2canvas(ganttContent, {
+                scale: 2, // High quality
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#0d0d15',
-                windowWidth: element.scrollWidth + 100,
-                windowHeight: element.scrollHeight + 100,
-                width: element.scrollWidth,
-                height: element.scrollHeight
+                width: fullWidth,
+                height: fullHeight,
+                windowWidth: fullWidth + 100,
+                windowHeight: fullHeight + 100,
+                scrollX: 0,
+                scrollY: 0
             });
 
-            // Restore original dimensions
-            element.style.width = originalWidth;
-            element.style.height = originalHeight;
-            element.style.overflow = originalOverflow;
-            scrollContainer.scrollLeft = originalScrollLeft;
-            scrollContainer.scrollTop = originalScrollTop;
+            // Restore original styles
+            scrollContainer.style.height = originalStyles.scrollContainerHeight;
+            scrollContainer.style.maxHeight = originalStyles.scrollContainerMaxHeight;
+            scrollContainer.style.overflow = originalStyles.scrollContainerOverflow;
+            ganttContent.style.width = originalStyles.elementWidth;
+            ganttContent.style.height = originalStyles.elementHeight;
+            scrollContainer.scrollLeft = originalStyles.scrollLeft;
+            scrollContainer.scrollTop = originalStyles.scrollTop;
 
-            return canvas.toDataURL('image/png');
+            // Convert to blob and download
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    this.downloadBlob(blob, `${filename}.png`);
+                }
+            }, 'image/png');
+
         } catch (error) {
             console.error('Failed to capture Gantt screenshot:', error);
-            return null;
         }
     }
 
     /**
-     * Generate Excel-compatible HTML with formatted table and embedded image
+     * Get statistics grouped by work item type
      */
-    private generateExcelHtml(items: IWorkItemNode[], screenshotDataUrl: string | null): string {
-        const today = new Date().toLocaleDateString();
+    private getStatsByType(items: IWorkItemNode[]): Record<string, { count: number; effort: number; remaining: number; avgProgress: number }> {
+        const stats: Record<string, { count: number; effort: number; remaining: number; totalProgress: number }> = {};
 
-        // Calculate summary stats
-        const stats = this.calculateStats(items);
-
-        return `
-<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" 
-      xmlns:x="urn:schemas-microsoft-com:office:excel" 
-      xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="ProgId" content="Excel.Sheet">
-    <!--[if gte mso 9]>
-    <xml>
-        <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-                <x:ExcelWorksheet>
-                    <x:Name>Gantt Chart Export</x:Name>
-                    <x:WorksheetOptions>
-                        <x:DisplayGridlines/>
-                    </x:WorksheetOptions>
-                </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-        </x:ExcelWorkbook>
-    </xml>
-    <![endif]-->
-    <style>
-        body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-        h1 { color: #2b5797; margin-bottom: 5px; }
-        h2 { color: #444; font-size: 14pt; margin: 20px 0 10px 0; }
-        .meta { color: #666; font-size: 10pt; margin-bottom: 15px; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th { 
-            background-color: #2b5797; 
-            color: white; 
-            font-weight: bold; 
-            padding: 8px 12px; 
-            text-align: left;
-            border: 1px solid #1a3a5c;
+        for (const item of items) {
+            if (!stats[item.workItemType]) {
+                stats[item.workItemType] = { count: 0, effort: 0, remaining: 0, totalProgress: 0 };
+            }
+            stats[item.workItemType].count++;
+            stats[item.workItemType].effort += item.rollupEffort || 0;
+            stats[item.workItemType].remaining += item.rollupRemainingWork || 0;
+            stats[item.workItemType].totalProgress += item.percentComplete || 0;
         }
-        td { 
-            padding: 6px 12px; 
-            border: 1px solid #ddd; 
-            vertical-align: top;
+
+        // Calculate averages
+        const result: Record<string, { count: number; effort: number; remaining: number; avgProgress: number }> = {};
+        for (const [type, data] of Object.entries(stats)) {
+            result[type] = {
+                count: data.count,
+                effort: data.effort,
+                remaining: data.remaining,
+                avgProgress: data.count > 0 ? data.totalProgress / data.count : 0
+            };
         }
-        tr:nth-child(even) { background-color: #f8f9fa; }
-        tr:hover { background-color: #e8f4fd; }
-        .level-0 { font-weight: bold; background-color: #e8f4fd; }
-        .level-1 { padding-left: 20px; }
-        .level-2 { padding-left: 40px; }
-        .level-3 { padding-left: 60px; }
-        .epic { color: #6b3fa0; }
-        .feature { color: #2b5797; }
-        .pbi { color: #107c10; }
-        .bug { color: #d13438; }
-        .task { color: #ffc000; }
-        .number { text-align: right; }
-        .percent { text-align: center; }
-        .done { color: #107c10; font-weight: bold; }
-        .in-progress { color: #ff8c00; }
-        .not-started { color: #999; }
-        .summary-table { width: auto; margin-bottom: 25px; }
-        .summary-table th { background-color: #444; padding: 6px 15px; }
-        .summary-table td { padding: 6px 15px; font-weight: bold; }
-        .screenshot-container { margin: 25px 0; page-break-inside: avoid; }
-        .screenshot { max-width: 100%; border: 1px solid #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    </style>
-</head>
-<body>
-    <h1>📊 Gantt Chart Export</h1>
-    <div class="meta">Exported on ${today} | Total Items: ${items.length}</div>
-    
-    <!-- Summary Statistics -->
-    <h2>📈 Summary</h2>
-    <table class="summary-table">
-        <tr>
-            <th>Total Effort</th>
-            <th>Remaining</th>
-            <th>Completed</th>
-            <th>Overall Progress</th>
-        </tr>
-        <tr>
-            <td>${stats.totalEffort}h</td>
-            <td>${stats.totalRemaining}h</td>
-            <td>${stats.totalCompleted}h</td>
-            <td class="${stats.overallProgress >= 75 ? 'done' : stats.overallProgress > 0 ? 'in-progress' : 'not-started'}">${stats.overallProgress}%</td>
-        </tr>
-    </table>
-    
-    <!-- Gantt Chart Screenshot -->
-    ${screenshotDataUrl ? `
-    <h2>📅 Gantt Chart Visual</h2>
-    <div class="screenshot-container">
-        <img class="screenshot" src="${screenshotDataUrl}" alt="Gantt Chart">
-    </div>
-    ` : ''}
-    
-    <!-- Work Items Table -->
-    <h2>📋 Work Items Detail</h2>
-    <table>
-        <tr>
-            <th>ID</th>
-            <th>Type</th>
-            <th>Title</th>
-            <th>State</th>
-            <th>Assigned To</th>
-            <th>Start Date</th>
-            <th>End Date</th>
-            <th>Effort (h)</th>
-            <th>Remaining (h)</th>
-            <th>Done %</th>
-        </tr>
-        ${items.map(item => this.generateTableRow(item)).join('')}
-    </table>
-</body>
-</html>`;
-    }
 
-    /**
-     * Generate a table row for a work item
-     */
-    private generateTableRow(item: IWorkItemNode): string {
-        const typeClass = this.getTypeClass(item.workItemType);
-        const progressClass = item.percentComplete >= 100 ? 'done' :
-            item.percentComplete > 0 ? 'in-progress' : 'not-started';
-        const levelClass = `level-${Math.min(item.level, 3)}`;
-
-        return `
-        <tr class="${levelClass}">
-            <td class="number">${item.id}</td>
-            <td class="${typeClass}">${this.getTypeIcon(item.workItemType)} ${item.workItemType}</td>
-            <td>${'&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(item.level)}${this.escapeHtml(item.title)}</td>
-            <td>${item.state}</td>
-            <td>${this.escapeHtml(item.assignedTo)}</td>
-            <td>${item.calculatedStartDate ? formatShortDate(item.calculatedStartDate) : '-'}</td>
-            <td>${item.calculatedEndDate ? formatShortDate(item.calculatedEndDate) : '-'}</td>
-            <td class="number">${item.rollupEffort || 0}</td>
-            <td class="number">${item.rollupRemainingWork || 0}</td>
-            <td class="percent ${progressClass}">${item.percentComplete}%</td>
-        </tr>`;
-    }
-
-    /**
-     * Get CSS class for work item type
-     */
-    private getTypeClass(type: string): string {
-        switch (type) {
-            case 'Epic': return 'epic';
-            case 'Feature': return 'feature';
-            case 'Product Backlog Item': return 'pbi';
-            case 'Bug': return 'bug';
-            case 'Task': return 'task';
-            default: return '';
-        }
-    }
-
-    /**
-     * Get icon for work item type
-     */
-    private getTypeIcon(type: string): string {
-        switch (type) {
-            case 'Epic': return '👑';
-            case 'Feature': return '⭐';
-            case 'Product Backlog Item': return '📋';
-            case 'Bug': return '🐛';
-            case 'Task': return '✅';
-            case 'Release': return '🚀';
-            default: return '📌';
-        }
+        return result;
     }
 
     /**
@@ -313,15 +286,6 @@ class ExportService {
     }
 
     /**
-     * Escape HTML entities
-     */
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    /**
      * Flatten hierarchy to array for export
      */
     private flattenHierarchy(nodes: IWorkItemNode[]): IWorkItemNode[] {
@@ -341,6 +305,21 @@ class ExportService {
     }
 
     /**
+     * Download a blob as a file
+     */
+    private downloadBlob(blob: Blob, filename: string): void {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+    }
+
+    /**
      * Export work items to CSV format
      */
     public exportToCSV(
@@ -349,32 +328,23 @@ class ExportService {
     ): void {
         const flatItems = this.flattenHierarchy(workItems);
         const csvContent = this.generateCSV(flatItems);
-        this.downloadFile(csvContent, `${filename}.csv`, 'text/csv;charset=utf-8;');
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        this.downloadBlob(blob, `${filename}.csv`);
     }
 
     /**
-     * Generate simple CSV
+     * Generate CSV content
      */
     private generateCSV(items: IWorkItemNode[]): string {
         const headers = [
-            'ID',
-            'Level',
-            'Type',
-            'Title',
-            'State',
-            'Assigned To',
-            'Start Date',
-            'Target Date',
-            'Effort (h)',
-            'Remaining (h)',
-            'Completed (h)',
-            'Done %'
+            'ID', 'Level', 'Type', 'Title', 'State', 'Assigned To',
+            'Start Date', 'Target Date', 'Effort (h)', 'Remaining (h)', 'Done %'
         ];
 
         const rows: string[][] = [headers];
 
         for (const item of items) {
-            const row = [
+            rows.push([
                 item.id.toString(),
                 item.level.toString(),
                 item.workItemType,
@@ -385,10 +355,8 @@ class ExportService {
                 item.calculatedEndDate ? formatShortDate(item.calculatedEndDate) : '',
                 item.rollupEffort.toString(),
                 item.rollupRemainingWork.toString(),
-                item.rollupCompletedWork.toString(),
                 item.percentComplete.toString()
-            ];
-            rows.push(row);
+            ]);
         }
 
         return rows.map(row =>
@@ -404,25 +372,6 @@ class ExportService {
             return `"${value.replace(/"/g, '""')}"`;
         }
         return value;
-    }
-
-    /**
-     * Trigger file download
-     */
-    private downloadFile(content: string, filename: string, mimeType: string): void {
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.style.display = 'none';
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        setTimeout(() => URL.revokeObjectURL(url), 100);
     }
 }
 

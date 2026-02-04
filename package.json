@@ -16,7 +16,8 @@
     "html2canvas": "^1.4.1",
     "react": "^16.14.0",
     "react-dom": "^16.14.0",
-    "tfx-cli": "^0.23.1"
+    "tfx-cli": "^0.23.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^16.14.0",
