@@ -51,9 +51,11 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
     const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
     const [resizing, setResizing] = useState<{ column: string; startX: number; startWidth: number } | null>(null);
     const [showFieldConfig, setShowFieldConfig] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
+    const ganttContentRef = useRef<HTMLDivElement>(null);
 
     // Process work items into hierarchy
     useEffect(() => {
@@ -166,10 +168,23 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         });
     }, []);
 
-    const handleExport = useCallback(() => {
-        const timestamp = new Date().toISOString().split('T')[0];
-        exportService.exportToExcel(hierarchy, `gantt-export-${timestamp}`, dateRange);
-    }, [hierarchy, dateRange]);
+    const handleExport = useCallback(async () => {
+        if (isExporting) return;
+        setIsExporting(true);
+
+        try {
+            const timestamp = new Date().toISOString().split('T')[0];
+            await exportService.exportToExcelWithScreenshot(
+                hierarchy,
+                ganttContentRef.current,
+                `gantt-export-${timestamp}`
+            );
+        } catch (error) {
+            console.error('Export failed:', error);
+        } finally {
+            setIsExporting(false);
+        }
+    }, [hierarchy, isExporting]);
 
     // Column resize handlers
     const handleResizeStart = useCallback((e: React.MouseEvent, column: string) => {
@@ -323,7 +338,13 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </div>
                     <button className="gantt-btn" onClick={handleExpandAll}>Expand All</button>
                     <button className="gantt-btn" onClick={handleCollapseAll}>Collapse All</button>
-                    <button className="gantt-btn gantt-btn-export" onClick={handleExport}>📥 Export</button>
+                    <button
+                        className="gantt-btn gantt-btn-export"
+                        onClick={handleExport}
+                        disabled={isExporting}
+                    >
+                        {isExporting ? '⏳ Exporting...' : '📥 Export'}
+                    </button>
                 </div>
             </div>
 
@@ -357,7 +378,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
 
             {/* Single Scroll Container for Body */}
             <div className="gantt-scroll-container" ref={scrollContainerRef}>
-                <div className="gantt-scroll-content">
+                <div className="gantt-scroll-content" ref={ganttContentRef}>
                     {/* Table Body */}
                     <div className="gantt-table-body" style={{ width: tableWidth }}>
                         {flattenedItems.map(item => (
