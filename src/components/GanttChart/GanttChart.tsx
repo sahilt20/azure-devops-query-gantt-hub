@@ -168,6 +168,13 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         });
     }, []);
 
+    // Sync scroll between body and timeline header
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current && timelineScrollRef.current) {
+            timelineScrollRef.current.scrollLeft = scrollContainerRef.current.scrollLeft;
+        }
+    }, []);
+
     const handleExport = useCallback(async () => {
         if (isExporting) return;
         setIsExporting(true);
@@ -377,7 +384,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
             </div>
 
             {/* Single Scroll Container for Body */}
-            <div className="gantt-scroll-container" ref={scrollContainerRef}>
+            <div className="gantt-scroll-container" ref={scrollContainerRef} onScroll={handleScroll}>
                 <div className="gantt-scroll-content" ref={ganttContentRef}>
                     {/* Table Body */}
                     <div className="gantt-table-body" style={{ width: tableWidth }}>

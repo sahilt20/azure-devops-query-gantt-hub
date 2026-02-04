@@ -233,6 +233,11 @@
 .gantt-table-body {
     flex-shrink: 0;
     border-right: 2px solid var(--gantt-border);
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    background: var(--gantt-bg);
+    /* Ensure opaque background when timeline slides under */
 }
 
 /* Timeline Body */
