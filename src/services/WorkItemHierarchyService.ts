@@ -31,12 +31,19 @@ class WorkItemHierarchyService {
     }
 
     /**
-     * Convert Azure DevOps WorkItem to IWorkItemNode
-     */
+         * Convert Azure DevOps WorkItem to IWorkItemNode
+         */
     public convertToNode(workItem: WorkItem): IWorkItemNode {
         const fields = workItem.fields || {};
         const workItemType = this.normalizeWorkItemType(fields['System.WorkItemType']);
-        const originalEstimate = this.parseNumber(fields['Microsoft.VSTS.Scheduling.OriginalEstimate']);
+
+        // Get field config for dynamic field mapping
+        const fieldConfig = this.getFieldConfig();
+
+        // Read effort/remaining from configured fields
+        const originalEstimate = this.parseNumber(fields[fieldConfig.effortField] || fields['Microsoft.VSTS.Scheduling.OriginalEstimate']);
+        const remainingWork = this.parseNumber(fields[fieldConfig.remainingField] || fields['Microsoft.VSTS.Scheduling.RemainingWork']);
+        const completedWork = this.parseNumber(fields['Microsoft.VSTS.Scheduling.CompletedWork']);
 
         return createEmptyWorkItemNode({
             id: workItem.id,
@@ -47,8 +54,8 @@ class WorkItemHierarchyService {
             effort: this.parseNumber(fields['Microsoft.VSTS.Scheduling.Effort']),
             originalEstimate,
             plannedHours: originalEstimate, // Alias for clarity
-            remainingWork: this.parseNumber(fields['Microsoft.VSTS.Scheduling.RemainingWork']),
-            completedWork: this.parseNumber(fields['Microsoft.VSTS.Scheduling.CompletedWork']),
+            remainingWork,
+            completedWork,
             startDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.StartDate']),
             targetDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.TargetDate']),
             devCompletionDate: parseAzureDate(fields['Custom.DevCompletionDate'] || fields['Microsoft.VSTS.Scheduling.FinishDate']),
@@ -60,6 +67,29 @@ class WorkItemHierarchyService {
             isExpanded: true,
             hasValidDates: false // Will be set during date calculation
         });
+    }
+
+    /**
+     * Get field configuration (lazy loaded to avoid circular dependency)
+     */
+    private getFieldConfig(): { effortField: string; remainingField: string } {
+        try {
+            // Dynamically import to avoid circular dependency
+            const stored = localStorage.getItem('gantt-field-config');
+            if (stored) {
+                const config = JSON.parse(stored);
+                return {
+                    effortField: config.effortField || 'Microsoft.VSTS.Scheduling.OriginalEstimate',
+                    remainingField: config.remainingField || 'Microsoft.VSTS.Scheduling.RemainingWork'
+                };
+            }
+        } catch (e) {
+            console.warn('Failed to load field config:', e);
+        }
+        return {
+            effortField: 'Microsoft.VSTS.Scheduling.OriginalEstimate',
+            remainingField: 'Microsoft.VSTS.Scheduling.RemainingWork'
+        };
     }
 
     /**

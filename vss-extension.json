@@ -1,7 +1,7 @@
 {
     "manifestVersion": 1,
     "id": "query-gantt-hub",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "name": "Query Gantt Chart",
     "description": "Adds a Gantt Chart view to Azure DevOps Queries with effort rollup from Epic → Feature → PBI → Task",
     "publisher": "SahilTanwar",
