@@ -250,7 +250,7 @@ class ExportService {
                 injectedStyleElement = document.createElement('style');
                 injectedStyleElement.id = 'gantt-export-theme-override';
                 injectedStyleElement.textContent = `
-                    /* Temporary light theme override for screenshot export - ULTRA AGGRESSIVE */
+                    /* Temporary light theme override for screenshot export */
                     :root, body, html, .theme-light, .gantt-chart, .gantt-chart-content,
                     .gantt-scroll-container, .gantt-scroll-content {
                         --gantt-bg: #f8f9fa !important;
@@ -264,15 +264,13 @@ class ExportService {
                         --gantt-grid-line: rgba(0, 0, 0, 0.1) !important;
                     }
 
-                    /* CRITICAL: Target the captured element and ALL its children */
+                    /* Target ONLY container elements, NOT the bars or visual content */
                     .gantt-chart-content,
-                    .gantt-chart-content *,
                     .gantt-chart,
                     .gantt-scroll-container,
                     .gantt-scroll-content,
                     .gantt-timeline,
                     .gantt-timeline-body,
-                    .gantt-timeline-body > *,
                     .gantt-table-body {
                         background-color: #ffffff !important;
                         background: #ffffff !important;
@@ -302,6 +300,14 @@ class ExportService {
 
                     .gantt-timeline-grid-line {
                         background-color: rgba(0, 0, 0, 0.1) !important;
+                    }
+
+                    /* CRITICAL: DO NOT make bars white - they need their colors! */
+                    .gantt-bar,
+                    .gantt-bar-progress,
+                    .gantt-type-icon {
+                        background: unset !important;
+                        background-color: unset !important;
                     }
                 `;
                 document.head.appendChild(injectedStyleElement);
