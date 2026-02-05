@@ -178,8 +178,12 @@ class ExportService {
 
     /**
      * Capture full Gantt screenshot (including headers, timeline, and all scrollable content) and download as PNG
+     *
+     * NEW STRATEGY: Inject styles into ORIGINAL DOM before capture, then remove after
      */
     public async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
+        let injectedStyleElement: HTMLStyleElement | null = null;
+
         try {
             // Element should be .gantt-chart-content wrapper containing headers + scroll container
             const ganttChartContent = element;
@@ -231,13 +235,65 @@ class ExportService {
             scrollContainer.scrollLeft = 0;
             scrollContainer.scrollTop = 0;
 
-            // Wait for layout to update
-            await new Promise(resolve => setTimeout(resolve, 300));
-
             // Determine background color based on theme
             const isLightTheme = document.body.classList.contains('theme-light') ||
                 document.documentElement.classList.contains('theme-light');
             const backgroundColor = isLightTheme ? '#ffffff' : '#1e1e2e';
+
+            // NEW STRATEGY: Inject styles into ORIGINAL document BEFORE capture
+            if (isLightTheme) {
+                console.log('[ExportService] Light theme - injecting temporary styles into ORIGINAL DOM...');
+                injectedStyleElement = document.createElement('style');
+                injectedStyleElement.id = 'gantt-export-theme-override';
+                injectedStyleElement.textContent = `
+                    /* Temporary light theme override for screenshot export */
+                    :root, body, .theme-light, .gantt-chart, .gantt-chart-content,
+                    .gantt-scroll-container, .gantt-scroll-content {
+                        --gantt-bg: #f8f9fa !important;
+                        --gantt-header-bg: #ffffff !important;
+                        --gantt-row-bg: #ffffff !important;
+                        --gantt-row-hover: #f1f3f5 !important;
+                        --gantt-border: #dee2e6 !important;
+                        --gantt-text: #000000 !important;
+                        --gantt-text-muted: #495057 !important;
+                        --gantt-weekend-bg: rgba(0, 0, 0, 0.05) !important;
+                        --gantt-grid-line: rgba(0, 0, 0, 0.1) !important;
+                    }
+                    .gantt-chart,
+                    .gantt-chart-content,
+                    .gantt-scroll-container,
+                    .gantt-scroll-content,
+                    .gantt-timeline,
+                    .gantt-timeline-body,
+                    .gantt-table-body {
+                        background-color: #ffffff !important;
+                        background: #ffffff !important;
+                    }
+                    .gantt-row,
+                    .gantt-timeline-row {
+                        background-color: #ffffff !important;
+                        background: #ffffff !important;
+                        border-color: #dee2e6 !important;
+                    }
+                    .gantt-headers,
+                    .gantt-table-header,
+                    .gantt-timeline-header,
+                    .gantt-timeline-header-wrapper {
+                        background-color: #ffffff !important;
+                        background: #ffffff !important;
+                        border-color: #dee2e6 !important;
+                    }
+                    .gantt-timeline-grid,
+                    .gantt-timeline-grid-line {
+                        background-color: rgba(0, 0, 0, 0.1) !important;
+                    }
+                `;
+                document.head.appendChild(injectedStyleElement);
+
+                // CRITICAL: Wait for styles to be applied by browser
+                await new Promise(resolve => setTimeout(resolve, 500));
+                console.log('[ExportService] Styles injected, waiting for browser reflow...');
+            }
 
             // Capture the FULL chart including headers
             const canvas = await html2canvas(ganttChartContent, {
@@ -250,165 +306,7 @@ class ExportService {
                 windowWidth: fullWidth + 100,
                 windowHeight: fullHeight + headersHeight + 100,
                 scrollX: 0,
-                scrollY: 0,
-                onclone: (clonedDoc) => {
-                    // CRITICAL: html2canvas may not correctly inherit CSS variables
-                    // We must inject CSS variable overrides AND set inline styles to force correct theming
-                    if (isLightTheme) {
-                        console.log('[ExportService] Light theme detected, injecting CSS overrides...');
-
-                        // STRATEGY 1: Inject a <style> tag that overrides ALL CSS variables
-                        // This ensures any element using var(--gantt-bg) etc. gets the correct value
-                        const styleOverride = clonedDoc.createElement('style');
-                        styleOverride.textContent = `
-                            :root, body, .theme-light, .gantt-chart, .gantt-chart-content {
-                                --gantt-bg: #f8f9fa !important;
-                                --gantt-header-bg: #ffffff !important;
-                                --gantt-row-bg: #ffffff !important;
-                                --gantt-row-hover: #f1f3f5 !important;
-                                --gantt-border: #dee2e6 !important;
-                                --gantt-text: #000000 !important;
-                                --gantt-text-muted: #495057 !important;
-                                --gantt-weekend-bg: rgba(0, 0, 0, 0.05) !important;
-                                --gantt-grid-line: rgba(0, 0, 0, 0.1) !important;
-                            }
-                            .gantt-chart,
-                            .gantt-chart-content,
-                            .gantt-scroll-container,
-                            .gantt-scroll-content,
-                            .gantt-timeline,
-                            .gantt-timeline-body,
-                            .gantt-table-body {
-                                background-color: #ffffff !important;
-                            }
-                            .gantt-row,
-                            .gantt-timeline-row {
-                                background-color: #ffffff !important;
-                                border-color: #dee2e6 !important;
-                            }
-                            .gantt-headers,
-                            .gantt-table-header,
-                            .gantt-timeline-header,
-                            .gantt-timeline-header-wrapper {
-                                background-color: #ffffff !important;
-                                border-color: #dee2e6 !important;
-                            }
-                        `;
-                        clonedDoc.head.appendChild(styleOverride);
-
-                        // STRATEGY 2: Also add theme class to body and documentElement
-                        clonedDoc.body.classList.add('theme-light');
-                        clonedDoc.documentElement.classList.add('theme-light');
-
-                        // Also add to .query-gantt-hub since that's where theme is applied
-                        const hub = clonedDoc.querySelector('.query-gantt-hub');
-                        if (hub) {
-                            (hub as HTMLElement).classList.add('theme-light');
-                            console.log('[ExportService] Added theme-light to .query-gantt-hub');
-                        }
-
-                        // Force light theme colors on all relevant elements via inline styles
-                        // This bypasses any CSS variable inheritance issues in html2canvas
-                        const lightBg = '#f8f9fa';
-                        const lightRowBg = '#ffffff';
-                        const lightHeaderBg = '#ffffff';
-                        const lightBorder = '#dee2e6';
-                        const lightGridLine = 'rgba(0, 0, 0, 0.1)';
-
-                        // Main container - this is the key element that sets the overall background
-                        const ganttChart = clonedDoc.querySelector('.gantt-chart');
-                        if (ganttChart) {
-                            (ganttChart as HTMLElement).style.backgroundColor = lightBg;
-                            (ganttChart as HTMLElement).style.borderColor = lightBorder;
-                            console.log('[ExportService] Set .gantt-chart background to', lightBg);
-                        }
-
-                        // Chart content wrapper
-                        const chartContent = clonedDoc.querySelector('.gantt-chart-content');
-                        if (chartContent) {
-                            (chartContent as HTMLElement).style.backgroundColor = lightBg;
-                        }
-
-                        // Timeline grid - THE ACTUAL ELEMENT (not .gantt-timeline which doesn't exist!)
-                        const timelineGrid = clonedDoc.querySelector('.gantt-timeline-grid');
-                        if (timelineGrid) {
-                            (timelineGrid as HTMLElement).style.backgroundColor = lightRowBg;
-                        }
-
-                        // Timeline body - CRITICAL: This contains all the timeline rows
-                        const timelineBody = clonedDoc.querySelector('.gantt-timeline-body');
-                        if (timelineBody) {
-                            (timelineBody as HTMLElement).style.backgroundColor = lightRowBg;
-                        }
-
-                        // Timeline panel wrapper
-                        const timeline = clonedDoc.querySelector('.gantt-timeline');
-                        if (timeline) {
-                            (timeline as HTMLElement).style.backgroundColor = lightRowBg;
-                        }
-
-                        // All row backgrounds (both table and timeline rows)
-                        const rows = clonedDoc.querySelectorAll('.gantt-row, .gantt-timeline-row');
-                        rows.forEach(row => {
-                            (row as HTMLElement).style.backgroundColor = lightRowBg;
-                            (row as HTMLElement).style.borderColor = lightBorder;
-                        });
-
-                        // Timeline grid lines
-                        const gridLines = clonedDoc.querySelectorAll('.gantt-timeline-grid-line');
-                        gridLines.forEach(line => {
-                            (line as HTMLElement).style.backgroundColor = lightGridLine;
-                        });
-
-                        // Table body
-                        const tableBody = clonedDoc.querySelector('.gantt-table-body');
-                        if (tableBody) {
-                            (tableBody as HTMLElement).style.backgroundColor = lightBg;
-                        }
-
-                        // Headers
-                        const headers = clonedDoc.querySelectorAll('.gantt-header, .gantt-timeline-header, .gantt-headers, .gantt-timeline-header-wrapper, .gantt-table-header');
-                        headers.forEach(header => {
-                            (header as HTMLElement).style.backgroundColor = lightHeaderBg;
-                            (header as HTMLElement).style.borderColor = lightBorder;
-                        });
-
-                        // Scroll containers
-                        const scrollContainer = clonedDoc.querySelector('.gantt-scroll-container');
-                        if (scrollContainer) {
-                            (scrollContainer as HTMLElement).style.backgroundColor = lightRowBg;
-                        }
-
-                        // Scroll content - CRITICAL for timeline background
-                        const scrollContent = clonedDoc.querySelector('.gantt-scroll-content');
-                        if (scrollContent) {
-                            (scrollContent as HTMLElement).style.backgroundColor = lightRowBg;
-                        }
-
-                        // Toolbar (if captured)
-                        const toolbar = clonedDoc.querySelector('.gantt-toolbar');
-                        if (toolbar) {
-                            (toolbar as HTMLElement).style.backgroundColor = lightHeaderBg;
-                            (toolbar as HTMLElement).style.borderColor = lightBorder;
-                        }
-
-                        // All cells
-                        const cells = clonedDoc.querySelectorAll('.gantt-cell');
-                        cells.forEach(cell => {
-                            const el = cell as HTMLElement;
-                            // Only set color if it's using the CSS variable
-                            if (window.getComputedStyle(el).color.includes('rgb')) {
-                                el.style.color = '#000000';
-                            }
-                        });
-
-                        // Text elements
-                        const textElements = clonedDoc.querySelectorAll('.gantt-item-title, .gantt-toolbar-title, .gantt-cell-effort, .gantt-cell-remaining');
-                        textElements.forEach(el => {
-                            (el as HTMLElement).style.color = '#000000';
-                        });
-                    }
-                }
+                scrollY: 0
             });
 
             // Restore original styles
@@ -436,6 +334,12 @@ class ExportService {
 
         } catch (error) {
             console.error('Failed to capture Gantt screenshot:', error);
+        } finally {
+            // CRITICAL: Remove injected style element from original DOM
+            if (injectedStyleElement && injectedStyleElement.parentNode) {
+                console.log('[ExportService] Removing injected style element...');
+                injectedStyleElement.parentNode.removeChild(injectedStyleElement);
+            }
         }
     }
 
