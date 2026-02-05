@@ -246,8 +246,8 @@ class ExportService {
                 injectedStyleElement = document.createElement('style');
                 injectedStyleElement.id = 'gantt-export-theme-override';
                 injectedStyleElement.textContent = `
-                    /* Temporary light theme override for screenshot export */
-                    :root, body, .theme-light, .gantt-chart, .gantt-chart-content,
+                    /* Temporary light theme override for screenshot export - ULTRA AGGRESSIVE */
+                    :root, body, html, .theme-light, .gantt-chart, .gantt-chart-content,
                     .gantt-scroll-container, .gantt-scroll-content {
                         --gantt-bg: #f8f9fa !important;
                         --gantt-header-bg: #ffffff !important;
@@ -259,22 +259,28 @@ class ExportService {
                         --gantt-weekend-bg: rgba(0, 0, 0, 0.05) !important;
                         --gantt-grid-line: rgba(0, 0, 0, 0.1) !important;
                     }
-                    .gantt-chart,
+
+                    /* CRITICAL: Target the captured element and ALL its children */
                     .gantt-chart-content,
+                    .gantt-chart-content *,
+                    .gantt-chart,
                     .gantt-scroll-container,
                     .gantt-scroll-content,
                     .gantt-timeline,
                     .gantt-timeline-body,
+                    .gantt-timeline-body > *,
                     .gantt-table-body {
                         background-color: #ffffff !important;
                         background: #ffffff !important;
                     }
+
                     .gantt-row,
                     .gantt-timeline-row {
                         background-color: #ffffff !important;
                         background: #ffffff !important;
                         border-color: #dee2e6 !important;
                     }
+
                     .gantt-headers,
                     .gantt-table-header,
                     .gantt-timeline-header,
@@ -283,7 +289,13 @@ class ExportService {
                         background: #ffffff !important;
                         border-color: #dee2e6 !important;
                     }
-                    .gantt-timeline-grid,
+
+                    /* Grid should be subtle, not white */
+                    .gantt-timeline-grid {
+                        background-color: transparent !important;
+                        background: transparent !important;
+                    }
+
                     .gantt-timeline-grid-line {
                         background-color: rgba(0, 0, 0, 0.1) !important;
                     }
