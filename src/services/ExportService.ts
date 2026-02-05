@@ -183,6 +183,7 @@ class ExportService {
      */
     public async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
         let injectedStyleElement: HTMLStyleElement | null = null;
+        let originalInlineStyles: Map<HTMLElement, { background: string; backgroundColor: string }> | null = null;
 
         try {
             // Element should be .gantt-chart-content wrapper containing headers + scroll container
@@ -313,17 +314,31 @@ class ExportService {
                 if (timelineBody) {
                     const computedBg = window.getComputedStyle(timelineBody).backgroundColor;
                     console.log('[ExportService] Timeline body computed background:', computedBg);
+                }
 
-                    // FORCE set inline style as last resort
+                // CRITICAL: Store original inline styles before modifying
+                originalInlineStyles = new Map();
+                const timelineRows = ganttChartContent.querySelectorAll('.gantt-timeline-row');
+                console.log('[ExportService] Found', timelineRows.length, 'timeline rows');
+
+                // Store and set inline styles
+                if (timelineBody) {
+                    originalInlineStyles.set(timelineBody, {
+                        background: timelineBody.style.background,
+                        backgroundColor: timelineBody.style.backgroundColor
+                    });
                     timelineBody.style.backgroundColor = '#ffffff';
                     timelineBody.style.background = '#ffffff';
                 }
 
-                const timelineRows = ganttChartContent.querySelectorAll('.gantt-timeline-row');
-                console.log('[ExportService] Found', timelineRows.length, 'timeline rows');
                 timelineRows.forEach((row) => {
-                    (row as HTMLElement).style.backgroundColor = '#ffffff';
-                    (row as HTMLElement).style.background = '#ffffff';
+                    const el = row as HTMLElement;
+                    originalInlineStyles!.set(el, {
+                        background: el.style.background,
+                        backgroundColor: el.style.backgroundColor
+                    });
+                    el.style.backgroundColor = '#ffffff';
+                    el.style.background = '#ffffff';
                 });
 
                 // Additional wait to ensure inline styles are applied
@@ -375,6 +390,15 @@ class ExportService {
             if (injectedStyleElement && injectedStyleElement.parentNode) {
                 console.log('[ExportService] Removing injected style element...');
                 injectedStyleElement.parentNode.removeChild(injectedStyleElement);
+            }
+
+            // CRITICAL: Restore original inline styles
+            if (originalInlineStyles) {
+                console.log('[ExportService] Restoring original inline styles...');
+                originalInlineStyles.forEach((styles, element) => {
+                    element.style.background = styles.background;
+                    element.style.backgroundColor = styles.backgroundColor;
+                });
             }
         }
     }
