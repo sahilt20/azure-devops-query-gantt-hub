@@ -3,7 +3,7 @@
  * Modern, premium design with smooth animations
  */
 
-/* CSS Variables for theming */
+/* CSS Variables for theming - Dark Theme (Default) */
 :root {
     --gantt-bg: #1e1e2e;
     --gantt-header-bg: #2d2d3d;
@@ -40,6 +40,25 @@
     --gantt-row-height: 44px;
 }
 
+/* Light Theme Override */
+.theme-light {
+    --gantt-bg: #f8f9fa;
+    --gantt-header-bg: #ffffff;
+    --gantt-row-bg: #ffffff;
+    --gantt-row-hover: #f1f3f5;
+    --gantt-border: #dee2e6;
+    --gantt-text: #212529;
+    --gantt-text-muted: #6c757d;
+    --gantt-weekend-bg: rgba(0, 0, 0, 0.02);
+    --gantt-today-line: #ef4444;
+    --gantt-grid-line: rgba(0, 0, 0, 0.08);
+
+    /* Work item type colors remain the same in light theme */
+    /* Progress bar colors */
+    --progress-bg: rgba(0, 0, 0, 0.05);
+    --progress-fill: linear-gradient(90deg, #4299e1, #48bb78);
+}
+
 /* Main Gantt Container */
 .gantt-chart {
     display: flex;
@@ -50,6 +69,14 @@
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Gantt Chart Content wrapper (for screenshot capture) */
+.gantt-chart-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
 }
 
 /* Toolbar */
@@ -144,6 +171,61 @@
 .gantt-btn:hover {
     background: var(--gantt-row-hover);
     border-color: #4299e1;
+}
+
+/* Export Dropdown */
+.gantt-export-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.gantt-export-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--gantt-header-bg);
+    border: 1px solid var(--gantt-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    min-width: 220px;
+    z-index: 1000;
+    overflow: hidden;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.gantt-export-menu-item {
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    color: var(--gantt-text);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gantt-export-menu-item:hover {
+    background: var(--gantt-row-hover);
+}
+
+.gantt-export-menu-item:not(:last-child) {
+    border-bottom: 1px solid var(--gantt-border);
 }
 
 /* Resizing state */
@@ -780,28 +862,6 @@
     .gantt-cell-remaining {
         display: none;
     }
-}
-
-/* Percent complete color coding */
-.percent-0-25 {
-    color: #f56565;
-}
-
-.percent-25-50 {
-    color: #ed8936;
-}
-
-.percent-50-75 {
-    color: #ecc94b;
-}
-
-.percent-75-100 {
-    color: #48bb78;
-}
-
-.percent-100 {
-    color: #38a169;
-    font-weight: 700;
 }
 
 /* Indentation for hierarchy */

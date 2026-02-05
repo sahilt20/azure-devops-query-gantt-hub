@@ -65,13 +65,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
         return (workItem.workItemType || '?').charAt(0).toUpperCase();
     };
 
-    const getPercentClass = (percent: number): string => {
-        if (percent === 100) return 'percent-100';
-        if (percent >= 75) return 'percent-75-100';
-        if (percent >= 50) return 'percent-50-75';
-        if (percent >= 25) return 'percent-25-50';
-        return 'percent-0-25';
-    };
+
 
     const formatEffort = (hours: number): string => {
         if (hours === 0) return '-';
@@ -148,7 +142,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
             </div>
 
             {/* Percent Complete */}
-            <div className={`gantt-cell gantt-cell-percent ${getPercentClass(workItem.percentComplete)}`}>
+            <div className="gantt-cell gantt-cell-percent">
                 {workItem.percentComplete}%
             </div>
         </div>
