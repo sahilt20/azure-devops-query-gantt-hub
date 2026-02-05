@@ -446,7 +446,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                                 key={item.id}
                                 workItem={item}
                                 onToggle={handleToggle}
-                                onClick={onWorkItemClick}
                                 columnWidths={columnWidths}
                             />
                         ))}

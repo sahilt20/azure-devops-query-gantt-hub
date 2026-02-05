@@ -280,16 +280,19 @@ class EffortRollupService {
         }
 
         // Calculate overall percent based on Remaining Work vs Effort
-        // This is more robust as many teams don't explicitly track "Completed Work" field
+        // Formula: % Done = (Effort - Remaining) / Effort * 100
         const overallPercent = totalEffort > 0
-            ? Math.round(100 - ((totalRemaining / totalEffort) * 100))
+            ? Math.round(((totalEffort - totalRemaining) / totalEffort) * 100)
             : 0;
+
+        // Ensure percent is within bounds [0, 100]
+        const boundedPercent = Math.max(0, Math.min(100, overallPercent));
 
         return {
             totalEffort,
             totalCompleted,
             totalRemaining,
-            overallPercent,
+            overallPercent: boundedPercent,
             itemCount
         };
     }

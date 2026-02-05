@@ -19,7 +19,6 @@ interface IColumnWidths {
 interface IGanttRowProps {
     workItem: IWorkItemNode;
     onToggle: (id: number) => void;
-    onClick?: (workItem: IWorkItemNode) => void;
     columnWidths?: IColumnWidths;
 }
 
@@ -33,7 +32,6 @@ const DEFAULT_WIDTHS: IColumnWidths = {
 export const GanttRow: React.FC<IGanttRowProps> = ({
     workItem,
     onToggle,
-    onClick,
     columnWidths = DEFAULT_WIDTHS
 }) => {
     const typeClass = getWorkItemTypeClass(workItem.workItemType);
@@ -52,13 +50,8 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
 
     const hasChildren = workItem.children.length > 0;
 
-    const handleRowClick = () => {
-        if (onClick) {
-            onClick(workItem);
-        }
-    };
-
     const handleTitleClick = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         azureDevOpsService.openWorkItem(workItem.id);
     };
@@ -70,7 +63,6 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     return (
         <div
             className={`gantt-row ${typeClass}`}
-            onClick={handleRowClick}
             style={{ gridTemplateColumns: gridTemplate }}
         >
             {/* Title with expand button and type icon */}
