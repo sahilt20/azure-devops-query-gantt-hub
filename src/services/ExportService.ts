@@ -303,11 +303,33 @@ class ExportService {
                 document.head.appendChild(injectedStyleElement);
 
                 // CRITICAL: Wait for styles to be applied by browser
-                await new Promise(resolve => setTimeout(resolve, 500));
-                console.log('[ExportService] Styles injected, waiting for browser reflow...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('[ExportService] Styles injected and reflow complete.');
+
+                // DEBUG: Check if styles are actually applied
+                const timelineBody = ganttChartContent.querySelector('.gantt-timeline-body') as HTMLElement;
+                if (timelineBody) {
+                    const computedBg = window.getComputedStyle(timelineBody).backgroundColor;
+                    console.log('[ExportService] Timeline body computed background:', computedBg);
+
+                    // FORCE set inline style as last resort
+                    timelineBody.style.backgroundColor = '#ffffff';
+                    timelineBody.style.background = '#ffffff';
+                }
+
+                const timelineRows = ganttChartContent.querySelectorAll('.gantt-timeline-row');
+                console.log('[ExportService] Found', timelineRows.length, 'timeline rows');
+                timelineRows.forEach((row) => {
+                    (row as HTMLElement).style.backgroundColor = '#ffffff';
+                    (row as HTMLElement).style.background = '#ffffff';
+                });
+
+                // Additional wait to ensure inline styles are applied
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
 
             // Capture the FULL chart including headers
+            console.log('[ExportService] Starting html2canvas capture...');
             const canvas = await html2canvas(ganttChartContent, {
                 scale: 2, // High quality
                 useCORS: true,
