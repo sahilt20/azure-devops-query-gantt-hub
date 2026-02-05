@@ -239,12 +239,6 @@ class ExportService {
                 document.documentElement.classList.contains('theme-light');
             const backgroundColor = isLightTheme ? '#ffffff' : '#1e1e2e';
 
-            // IMPORTANT: If light theme, we MUST add the class to the captured element itself
-            // because html2canvas might not inherit the body class context correctly
-            if (isLightTheme) {
-                ganttChartContent.classList.add('theme-light');
-            }
-
             // Capture the FULL chart including headers
             const canvas = await html2canvas(ganttChartContent, {
                 scale: 2, // High quality
@@ -256,13 +250,15 @@ class ExportService {
                 windowWidth: fullWidth + 100,
                 windowHeight: fullHeight + headersHeight + 100,
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                onclone: (clonedDoc) => {
+                    // IMPORTANT: The CSS variables are likely defined on body.theme-light
+                    // We must ensure the cloned document's body has the class
+                    if (isLightTheme) {
+                        clonedDoc.body.classList.add('theme-light');
+                    }
+                }
             });
-
-            // Clean up the added class
-            if (isLightTheme) {
-                ganttChartContent.classList.remove('theme-light');
-            }
 
             // Restore original styles
             ganttChartContent.style.height = originalStyles.chartContentHeight;
