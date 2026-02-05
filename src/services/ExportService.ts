@@ -255,72 +255,119 @@ class ExportService {
                     // CRITICAL: html2canvas may not correctly inherit CSS variables
                     // We must ALSO set inline styles on key elements to force correct theming
                     if (isLightTheme) {
+                        console.log('[ExportService] Light theme detected, applying inline styles...');
+
+                        // Add theme class to both body and the main hub container
                         clonedDoc.body.classList.add('theme-light');
+                        clonedDoc.documentElement.classList.add('theme-light');
+
+                        // Also add to .query-gantt-hub since that's where theme is applied
+                        const hub = clonedDoc.querySelector('.query-gantt-hub');
+                        if (hub) {
+                            (hub as HTMLElement).classList.add('theme-light');
+                            console.log('[ExportService] Added theme-light to .query-gantt-hub');
+                        }
 
                         // Force light theme colors on all relevant elements via inline styles
                         // This bypasses any CSS variable inheritance issues in html2canvas
-                        const lightThemeColors = {
-                            bg: '#f8f9fa',
-                            headerBg: '#ffffff',
-                            rowBg: '#ffffff',
-                            border: '#dee2e6',
-                            text: '#000000',
-                            textMuted: '#495057'
-                        };
+                        const lightBg = '#f8f9fa';
+                        const lightRowBg = '#ffffff';
+                        const lightHeaderBg = '#ffffff';
+                        const lightBorder = '#dee2e6';
+                        const lightGridLine = 'rgba(0, 0, 0, 0.1)';
 
-                        // Apply to main containers
+                        // Main container - this is the key element that sets the overall background
                         const ganttChart = clonedDoc.querySelector('.gantt-chart');
                         if (ganttChart) {
-                            (ganttChart as HTMLElement).style.backgroundColor = lightThemeColors.bg;
+                            (ganttChart as HTMLElement).style.backgroundColor = lightBg;
+                            (ganttChart as HTMLElement).style.borderColor = lightBorder;
+                            console.log('[ExportService] Set .gantt-chart background to', lightBg);
                         }
 
-                        // Timeline panel (the main dark area in the screenshot)
-                        const timeline = clonedDoc.querySelector('.gantt-timeline');
-                        if (timeline) {
-                            (timeline as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        // Chart content wrapper
+                        const chartContent = clonedDoc.querySelector('.gantt-chart-content');
+                        if (chartContent) {
+                            (chartContent as HTMLElement).style.backgroundColor = lightBg;
                         }
 
-                        // Timeline body
+                        // Timeline grid - THE ACTUAL ELEMENT (not .gantt-timeline which doesn't exist!)
+                        const timelineGrid = clonedDoc.querySelector('.gantt-timeline-grid');
+                        if (timelineGrid) {
+                            (timelineGrid as HTMLElement).style.backgroundColor = lightRowBg;
+                        }
+
+                        // Timeline body - CRITICAL: This contains all the timeline rows
                         const timelineBody = clonedDoc.querySelector('.gantt-timeline-body');
                         if (timelineBody) {
-                            (timelineBody as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                            (timelineBody as HTMLElement).style.backgroundColor = lightRowBg;
                         }
 
-                        // All row backgrounds
-                        const rows = clonedDoc.querySelectorAll('.gantt-row');
+                        // Timeline panel wrapper
+                        const timeline = clonedDoc.querySelector('.gantt-timeline');
+                        if (timeline) {
+                            (timeline as HTMLElement).style.backgroundColor = lightRowBg;
+                        }
+
+                        // All row backgrounds (both table and timeline rows)
+                        const rows = clonedDoc.querySelectorAll('.gantt-row, .gantt-timeline-row');
                         rows.forEach(row => {
-                            (row as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                            (row as HTMLElement).style.backgroundColor = lightRowBg;
+                            (row as HTMLElement).style.borderColor = lightBorder;
                         });
 
-                        // Timeline rows
-                        const timelineRows = clonedDoc.querySelectorAll('.gantt-timeline-row');
-                        timelineRows.forEach(row => {
-                            (row as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        // Timeline grid lines
+                        const gridLines = clonedDoc.querySelectorAll('.gantt-timeline-grid-line');
+                        gridLines.forEach(line => {
+                            (line as HTMLElement).style.backgroundColor = lightGridLine;
                         });
 
                         // Table body
                         const tableBody = clonedDoc.querySelector('.gantt-table-body');
                         if (tableBody) {
-                            (tableBody as HTMLElement).style.backgroundColor = lightThemeColors.bg;
+                            (tableBody as HTMLElement).style.backgroundColor = lightBg;
                         }
 
                         // Headers
-                        const headers = clonedDoc.querySelectorAll('.gantt-header, .gantt-timeline-header, .gantt-headers');
+                        const headers = clonedDoc.querySelectorAll('.gantt-header, .gantt-timeline-header, .gantt-headers, .gantt-timeline-header-wrapper, .gantt-table-header');
                         headers.forEach(header => {
-                            (header as HTMLElement).style.backgroundColor = lightThemeColors.headerBg;
+                            (header as HTMLElement).style.backgroundColor = lightHeaderBg;
+                            (header as HTMLElement).style.borderColor = lightBorder;
                         });
 
                         // Scroll containers
                         const scrollContainer = clonedDoc.querySelector('.gantt-scroll-container');
                         if (scrollContainer) {
-                            (scrollContainer as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                            (scrollContainer as HTMLElement).style.backgroundColor = lightRowBg;
                         }
 
-                        // Scroll content
+                        // Scroll content - CRITICAL for timeline background
                         const scrollContent = clonedDoc.querySelector('.gantt-scroll-content');
                         if (scrollContent) {
-                            (scrollContent as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                            (scrollContent as HTMLElement).style.backgroundColor = lightRowBg;
                         }
+
+                        // Toolbar (if captured)
+                        const toolbar = clonedDoc.querySelector('.gantt-toolbar');
+                        if (toolbar) {
+                            (toolbar as HTMLElement).style.backgroundColor = lightHeaderBg;
+                            (toolbar as HTMLElement).style.borderColor = lightBorder;
+                        }
+
+                        // All cells
+                        const cells = clonedDoc.querySelectorAll('.gantt-cell');
+                        cells.forEach(cell => {
+                            const el = cell as HTMLElement;
+                            // Only set color if it's using the CSS variable
+                            if (window.getComputedStyle(el).color.includes('rgb')) {
+                                el.style.color = '#000000';
+                            }
+                        });
+
+                        // Text elements
+                        const textElements = clonedDoc.querySelectorAll('.gantt-item-title, .gantt-toolbar-title, .gantt-cell-effort, .gantt-cell-remaining');
+                        textElements.forEach(el => {
+                            (el as HTMLElement).style.color = '#000000';
+                        });
                     }
                 }
             });
