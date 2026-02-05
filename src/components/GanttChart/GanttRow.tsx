@@ -7,6 +7,7 @@
 import React from 'react';
 import { IWorkItemNode } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
+import { getWorkItemTypeClass, getWorkItemTypeAbbreviation, getCustomTypeColor, isCustomType } from '../../utils/WorkItemTypeUtils';
 
 interface IColumnWidths {
     title: number;
@@ -35,35 +36,10 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     onClick,
     columnWidths = DEFAULT_WIDTHS
 }) => {
-    const getTypeClass = (): string => {
-        const type = (workItem.workItemType || '').toLowerCase();
-
-        if (type.includes('epic')) return 'epic';
-        if (type.includes('feature')) return 'feature';
-        if (type.includes('backlog') || type.includes('user story') || type.includes('requirement')) return 'pbi';
-        if (type.includes('task') || type.includes('test case')) return 'task';
-        if (type.includes('bug') || type.includes('issue')) return 'bug';
-        if (type.includes('release')) return 'release';
-
-        return 'unknown';
-    };
-
-    const getTypeAbbr = (): string => {
-        const type = (workItem.workItemType || '').toLowerCase();
-
-        if (type.includes('epic')) return 'E';
-        if (type.includes('feature')) return 'F';
-        if (type.includes('backlog')) return 'P';
-        if (type.includes('user story')) return 'S';
-        if (type.includes('requirement')) return 'R';
-        if (type.includes('task')) return 'T';
-        if (type.includes('test case')) return 'C';
-        if (type.includes('bug')) return 'B';
-        if (type.includes('issue')) return 'I';
-        if (type.includes('release')) return 'R';
-
-        return (workItem.workItemType || '?').charAt(0).toUpperCase();
-    };
+    const typeClass = getWorkItemTypeClass(workItem.workItemType);
+    const typeAbbr = getWorkItemTypeAbbreviation(workItem.workItemType);
+    const isCustom = isCustomType(workItem.workItemType);
+    const customColor = isCustom ? getCustomTypeColor(workItem.workItemType) : undefined;
 
 
 
@@ -93,7 +69,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
 
     return (
         <div
-            className={`gantt-row ${getTypeClass()}`}
+            className={`gantt-row ${typeClass}`}
             onClick={handleRowClick}
             style={{ gridTemplateColumns: gridTemplate }}
         >
@@ -115,8 +91,11 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                     <span style={{ width: 20 }} />
                 )}
 
-                <span className={`gantt-type-icon ${getTypeClass()}`}>
-                    {getTypeAbbr()}
+                <span
+                    className={`gantt-type-icon ${typeClass}`}
+                    style={customColor ? { backgroundColor: customColor } : undefined}
+                >
+                    {typeAbbr}
                 </span>
 
                 <a

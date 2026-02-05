@@ -550,8 +550,9 @@
     background: var(--color-release);
 }
 
-.gantt-type-icon.unknown {
+.gantt-type-icon.custom {
     background: var(--color-unknown);
+    /* Fallback color, usually overridden by inline style */
 }
 
 .gantt-item-title {

@@ -6,6 +6,7 @@
 import React from 'react';
 import { IWorkItemNode, WorkItemTypeColors } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
+import { getWorkItemTypeClass } from '../../utils/WorkItemTypeUtils';
 
 interface IGanttBarProps {
     workItem: IWorkItemNode;
@@ -23,18 +24,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     const hasValidDates = startPercent >= 0 && widthPercent > 0;
     const hasRealDates = workItem.hasValidDates;
 
-    const getTypeClass = (): string => {
-        const type = (workItem.workItemType || '').toLowerCase(); // Normalize to lowercase
-
-        if (type.includes('epic')) return 'epic';
-        if (type.includes('feature')) return 'feature';
-        if (type.includes('backlog') || type.includes('user story') || type.includes('requirement')) return 'pbi';
-        if (type.includes('task') || type.includes('test case')) return 'task';
-        if (type.includes('bug') || type.includes('issue')) return 'bug';
-        if (type.includes('release')) return 'release';
-
-        return 'unknown';
-    };
+    const typeClass = getWorkItemTypeClass(workItem.workItemType);
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -75,7 +65,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
 
     return (
         <div
-            className={`gantt-bar ${getTypeClass()} ${isFrameOnly ? 'no-dates' : ''}`}
+            className={`gantt-bar ${typeClass} ${isFrameOnly ? 'no-dates' : ''}`}
             style={{
                 left: `${clampedStart}%`,
                 width: `${clampedWidth}%`,
