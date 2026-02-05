@@ -236,9 +236,13 @@ class ExportService {
             scrollContainer.scrollTop = 0;
 
             // Determine background color based on theme
-            const isLightTheme = document.body.classList.contains('theme-light') ||
-                document.documentElement.classList.contains('theme-light');
+            // FIXED: Theme class is on .query-gantt-hub, not body!
+            const hubElement = document.querySelector('.query-gantt-hub') as HTMLElement;
+            const isLightTheme = hubElement?.classList.contains('theme-light') ||
+                                 document.body.classList.contains('theme-light') ||
+                                 document.documentElement.classList.contains('theme-light');
             const backgroundColor = isLightTheme ? '#ffffff' : '#1e1e2e';
+            console.log('[ExportService] Theme detection - isLightTheme:', isLightTheme);
 
             // NEW STRATEGY: Inject styles into ORIGINAL document BEFORE capture
             if (isLightTheme) {
