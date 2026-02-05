@@ -394,10 +394,19 @@ class ExportService {
 
             // CRITICAL: Restore original inline styles
             if (originalInlineStyles) {
-                console.log('[ExportService] Restoring original inline styles...');
+                console.log('[ExportService] Restoring', originalInlineStyles.size, 'inline styles...');
                 originalInlineStyles.forEach((styles, element) => {
-                    element.style.background = styles.background;
-                    element.style.backgroundColor = styles.backgroundColor;
+                    // If original was empty, remove the property instead of setting to empty string
+                    if (styles.background === '') {
+                        element.style.removeProperty('background');
+                    } else {
+                        element.style.background = styles.background;
+                    }
+                    if (styles.backgroundColor === '') {
+                        element.style.removeProperty('background-color');
+                    } else {
+                        element.style.backgroundColor = styles.backgroundColor;
+                    }
                 });
             }
         }
