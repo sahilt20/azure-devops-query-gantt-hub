@@ -301,14 +301,6 @@ class ExportService {
                     .gantt-timeline-grid-line {
                         background-color: rgba(0, 0, 0, 0.1) !important;
                     }
-
-                    /* CRITICAL: DO NOT make bars white - they need their colors! */
-                    .gantt-bar,
-                    .gantt-bar-progress,
-                    .gantt-type-icon {
-                        background: unset !important;
-                        background-color: unset !important;
-                    }
                 `;
                 document.head.appendChild(injectedStyleElement);
 
