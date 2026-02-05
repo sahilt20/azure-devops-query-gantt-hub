@@ -12,6 +12,70 @@
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* Light Theme */
+.query-gantt-hub.theme-light {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #dee2e6 100%);
+    color: #212529;
+}
+
+.query-gantt-hub.theme-light .hub-header {
+    background: rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.query-gantt-hub.theme-light .hub-title {
+    color: #212529;
+}
+
+.query-gantt-hub.theme-light .hub-subtitle {
+    color: #6c757d;
+}
+
+.query-gantt-hub.theme-light .hub-theme-toggle {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #212529;
+}
+
+.query-gantt-hub.theme-light .hub-theme-toggle:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: #4299e1;
+}
+
+.query-gantt-hub.theme-light .query-selector select {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #212529;
+}
+
+.query-gantt-hub.theme-light .query-selector select option {
+    background: #ffffff;
+    color: #212529;
+}
+
+.query-gantt-hub.theme-light .hub-btn-secondary {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #212529;
+}
+
+.query-gantt-hub.theme-light .hub-btn-secondary:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: #4299e1;
+}
+
+.query-gantt-hub.theme-light .hub-debug {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: #1e40af;
+}
+
+.query-gantt-hub.theme-light .hub-error {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #991b1b;
+}
+
 /* Header */
 .hub-header {
     display: flex;
@@ -21,6 +85,8 @@
     background: rgba(255, 255, 255, 0.03);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
+    position: relative;
+    z-index: 1001;
 }
 
 .hub-header-left {
@@ -79,6 +145,34 @@
     display: flex;
     align-items: center;
     gap: 16px;
+}
+
+/* Theme Toggle Button */
+.hub-theme-toggle {
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(45, 45, 61, 0.8);
+    color: #e4e4e7;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.hub-theme-toggle:hover {
+    background: rgba(55, 55, 75, 0.9);
+    border-color: #4299e1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
+}
+
+.hub-theme-toggle:active {
+    transform: translateY(0);
 }
 
 /* Query Selector */
