@@ -1,0 +1,377 @@
+/**
+ * Settings Panel
+ * Azure DevOps-style side panel with field configuration and documentation
+ */
+
+import React, { useState, useEffect } from 'react';
+import { azureDevOpsService } from '../../services/AzureDevOpsService';
+import { fieldConfigService, IFieldConfig, IWorkItemField } from '../../services/FieldConfigService';
+import './SettingsPanel.css';
+
+interface ISettingsPanelProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: () => void;
+}
+
+type SectionId = 'fields' | 'how-it-works' | 'key-terms';
+
+export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, onSave }) => {
+    const [fields, setFields] = useState<IWorkItemField[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [config, setConfig] = useState<IFieldConfig>(fieldConfigService.getConfig());
+    const [initialConfig, setInitialConfig] = useState<IFieldConfig>(fieldConfigService.getConfig());
+    const [expandedSections, setExpandedSections] = useState<Set<SectionId>>(new Set(['fields']));
+
+    const hasChanges = JSON.stringify(config) !== JSON.stringify(initialConfig);
+
+    useEffect(() => {
+        if (isOpen) {
+            loadFields();
+            const currentConfig = fieldConfigService.getConfig();
+            setConfig(currentConfig);
+            setInitialConfig(currentConfig);
+        }
+    }, [isOpen]);
+
+    const loadFields = async () => {
+        setLoading(true);
+        try {
+            const availableFields = await azureDevOpsService.getWorkItemFields();
+            const numericFields = availableFields.filter(f => f.isNumeric);
+            setFields(numericFields);
+        } catch (error) {
+            console.error('Failed to load fields:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleFieldChange = (fieldType: keyof IFieldConfig, value: string) => {
+        setConfig(prev => ({ ...prev, [fieldType]: value }));
+    };
+
+    const handleSave = () => {
+        fieldConfigService.setConfig(config);
+        onSave();
+        onClose();
+    };
+
+    const handleReset = () => {
+        fieldConfigService.resetConfig();
+        setConfig(fieldConfigService.getConfig());
+    };
+
+    const toggleSection = (sectionId: SectionId) => {
+        setExpandedSections(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(sectionId)) {
+                newSet.delete(sectionId);
+            } else {
+                newSet.add(sectionId);
+            }
+            return newSet;
+        });
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <>
+            {/* Overlay */}
+            <div className="settings-overlay" onClick={onClose} />
+
+            {/* Side Panel */}
+            <div className="settings-panel">
+                {/* Header */}
+                <div className="settings-header">
+                    <h2>⚙️ Settings</h2>
+                    <button className="settings-close" onClick={onClose}>×</button>
+                </div>
+
+                {/* Content */}
+                <div className="settings-content">
+                    {/* Field Configuration Section */}
+                    <div className="settings-section">
+                        <button
+                            className="settings-section-header"
+                            onClick={() => toggleSection('fields')}
+                        >
+                            <span className="settings-section-title">📊 Field Configuration</span>
+                            <span className={`settings-section-arrow ${expandedSections.has('fields') ? 'expanded' : ''}`}>
+                                ▼
+                            </span>
+                        </button>
+                        {expandedSections.has('fields') && (
+                            <div className="settings-section-body">
+                                <p className="settings-description">
+                                    Configure which Azure DevOps fields to use for effort calculations.
+                                </p>
+
+                                {loading ? (
+                                    <div className="settings-loading">Loading fields...</div>
+                                ) : (
+                                    <div className="settings-form">
+                                        <div className="settings-field">
+                                            <label htmlFor="effort-field">
+                                                <span className="field-label">Effort (Total Hours)</span>
+                                                <span className="field-hint">Field for planned/estimated work</span>
+                                            </label>
+                                            <select
+                                                id="effort-field"
+                                                value={config.effortField}
+                                                onChange={e => handleFieldChange('effortField', e.target.value)}
+                                            >
+                                                {fields.map(field => (
+                                                    <option key={field.referenceName} value={field.referenceName}>
+                                                        {field.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="settings-field">
+                                            <label htmlFor="remaining-field">
+                                                <span className="field-label">Remaining Work</span>
+                                                <span className="field-hint">Field for remaining hours</span>
+                                            </label>
+                                            <select
+                                                id="remaining-field"
+                                                value={config.remainingField}
+                                                onChange={e => handleFieldChange('remainingField', e.target.value)}
+                                            >
+                                                {fields.map(field => (
+                                                    <option key={field.referenceName} value={field.referenceName}>
+                                                        {field.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="settings-field">
+                                            <label>
+                                                <span className="field-label">Done %</span>
+                                                <span className="field-hint">Auto-calculated from Effort and Remaining</span>
+                                            </label>
+                                            <div className="settings-calculated">
+                                                🔢 <strong>Auto-Calculated:</strong> 100 - (Remaining ÷ Effort × 100)
+                                            </div>
+                                        </div>
+
+                                        <button className="settings-reset-btn" onClick={handleReset}>
+                                            Reset to Defaults
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* How It Works Section */}
+                    <div className="settings-section">
+                        <button
+                            className="settings-section-header"
+                            onClick={() => toggleSection('how-it-works')}
+                        >
+                            <span className="settings-section-title">💡 How It Works</span>
+                            <span className={`settings-section-arrow ${expandedSections.has('how-it-works') ? 'expanded' : ''}`}>
+                                ▼
+                            </span>
+                        </button>
+                        {expandedSections.has('how-it-works') && (
+                            <div className="settings-section-body">
+                                <div className="settings-doc">
+                                    <h4>Done % Calculation</h4>
+                                    <p>
+                                        Progress percentage is automatically calculated using the formula:
+                                        <code>Done % = 100 - (Remaining Work ÷ Total Effort × 100)</code>
+                                    </p>
+                                    <p>
+                                        For work items without effort values, the percentage is calculated based on child work items.
+                                    </p>
+
+                                    <h4>Effort Rollup</h4>
+                                    <p>
+                                        Effort values automatically roll up through the work item hierarchy:
+                                    </p>
+                                    <ul>
+                                        <li><strong>Tasks:</strong> Use their own Original Estimate (Planned Hours)</li>
+                                        <li><strong>PBIs/Bugs:</strong> Sum of all child task hours</li>
+                                        <li><strong>Features:</strong> Sum of all child PBI/Bug hours</li>
+                                        <li><strong>Epics:</strong> Sum of all child Feature hours</li>
+                                    </ul>
+                                    <p>
+                                        This ensures parent work items always reflect the total effort of their children.
+                                    </p>
+
+                                    <h4>Date Range Calculation</h4>
+                                    <p>
+                                        The Gantt chart calculates start and end dates using different logic per work item type:
+                                    </p>
+
+                                    <h5>Tasks</h5>
+                                    <ul>
+                                        <li>Uses Start Date + Planned Hours (7-hour working day)</li>
+                                        <li>Falls back to inherited start date from parent + Planned Hours</li>
+                                        <li>Falls back to Iteration Path start + Planned Hours</li>
+                                        <li>Falls back to Created Date</li>
+                                    </ul>
+
+                                    <h5>PBIs & Bugs</h5>
+                                    <ul>
+                                        <li>Uses Start Date → Dev/QA Completion Date</li>
+                                        <li>Falls back to inherited start date or earliest child start date</li>
+                                        <li>Calculates end date from sum of child Planned Hours</li>
+                                        <li>Falls back to Created Date</li>
+                                    </ul>
+
+                                    <h5>Features & Epics</h5>
+                                    <ul>
+                                        <li>Uses Start Date → Target Date</li>
+                                        <li>Falls back to inherited start date or child date range</li>
+                                        <li>Estimates duration based on children if no explicit dates</li>
+                                        <li>Falls back to Created Date</li>
+                                    </ul>
+
+                                    <h4>Start Date Inheritance</h4>
+                                    <p>
+                                        <strong>Important:</strong> If a work item doesn't have an explicit start date, it inherits from its parent work item.
+                                        This inheritance continues up the hierarchy until a start date is found.
+                                    </p>
+                                    <p>
+                                        For example: If a Task has no start date, it checks its parent PBI. If the PBI has no start date,
+                                        it checks the parent Feature, and so on. If no ancestor has a start date, the work item's Created Date is used.
+                                    </p>
+                                    <p>
+                                        This ensures that work items without explicit dates still appear in a reasonable timeline position.
+                                    </p>
+
+                                    <h4>Timeline Scaling</h4>
+                                    <p>
+                                        The timeline automatically adjusts to show all work items with appropriate spacing:
+                                    </p>
+                                    <ul>
+                                        <li><strong>Day View:</strong> Each column represents one day</li>
+                                        <li><strong>Week View:</strong> Each column represents one week</li>
+                                        <li><strong>Month View:</strong> Each column represents one month</li>
+                                    </ul>
+                                    <p>
+                                        Weekends are highlighted, and today's date is marked with a red line for easy reference.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Key Terms Section */}
+                    <div className="settings-section">
+                        <button
+                            className="settings-section-header"
+                            onClick={() => toggleSection('key-terms')}
+                        >
+                            <span className="settings-section-title">📖 Key Terms</span>
+                            <span className={`settings-section-arrow ${expandedSections.has('key-terms') ? 'expanded' : ''}`}>
+                                ▼
+                            </span>
+                        </button>
+                        {expandedSections.has('key-terms') && (
+                            <div className="settings-section-body">
+                                <div className="settings-doc">
+                                    <dl className="settings-glossary">
+                                        <dt>Original Estimate / Planned Hours</dt>
+                                        <dd>
+                                            The initial estimate of how many hours a task will take to complete.
+                                            Also called "Effort" for Product Backlog Items.
+                                        </dd>
+
+                                        <dt>Remaining Work</dt>
+                                        <dd>
+                                            The number of hours still needed to complete a work item.
+                                            This value decreases as work progresses.
+                                        </dd>
+
+                                        <dt>Completed Work</dt>
+                                        <dd>
+                                            The number of hours already spent on a work item.
+                                            Calculated as: Original Estimate - Remaining Work.
+                                        </dd>
+
+                                        <dt>Done %</dt>
+                                        <dd>
+                                            The percentage of work completed. Auto-calculated using the formula:
+                                            100 - (Remaining ÷ Effort × 100).
+                                        </dd>
+
+                                        <dt>Rollup</dt>
+                                        <dd>
+                                            The process of summing child work item values up to parent work items.
+                                            For example, a Feature's rollup effort is the sum of all its PBI efforts.
+                                        </dd>
+
+                                        <dt>Start Date</dt>
+                                        <dd>
+                                            The date when work on an item is scheduled to begin.
+                                            Can be explicit or inherited from parent work items.
+                                        </dd>
+
+                                        <dt>Target Date</dt>
+                                        <dd>
+                                            The date when work on an item is scheduled to complete.
+                                            Used primarily for Features and Epics.
+                                        </dd>
+
+                                        <dt>Dev/QA Completion Date</dt>
+                                        <dd>
+                                            Custom fields indicating when development or QA testing is expected to finish.
+                                            Used to calculate end dates for PBIs and Bugs.
+                                        </dd>
+
+                                        <dt>Created Date</dt>
+                                        <dd>
+                                            The date when a work item was created in Azure DevOps.
+                                            Used as the final fallback if no other start date is available.
+                                        </dd>
+
+                                        <dt>Working Day</dt>
+                                        <dd>
+                                            Defined as 7 hours for duration calculations.
+                                            Weekends are excluded when calculating working hours.
+                                        </dd>
+
+                                        <dt>Iteration Path</dt>
+                                        <dd>
+                                            The sprint or iteration a work item is assigned to.
+                                            Can provide start/end dates if explicit dates aren't set.
+                                        </dd>
+
+                                        <dt>Valid Dates</dt>
+                                        <dd>
+                                            Indicates whether a work item has real dates (explicit or inherited)
+                                            or is using default estimated dates. Items without valid dates show a dashed border.
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="settings-footer">
+                    <button className="settings-btn settings-btn-cancel" onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button
+                        className={`settings-btn settings-btn-save ${!hasChanges ? 'disabled' : ''}`}
+                        onClick={handleSave}
+                        disabled={!hasChanges}
+                    >
+                        Save Configuration
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+};
+
+export default SettingsPanel;

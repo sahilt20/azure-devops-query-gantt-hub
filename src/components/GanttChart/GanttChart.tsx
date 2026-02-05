@@ -21,7 +21,7 @@ import { GanttRow } from './GanttRow';
 import { GanttBar } from './GanttBar';
 import { GanttTimeline } from './GanttTimeline';
 import { DateRangePicker } from './DateRangePicker';
-import { FieldConfigModal } from '../FieldConfig/FieldConfigModal';
+import { SettingsPanel } from '../FieldConfig/SettingsPanel';
 import './GanttChart.css';
 
 interface IGanttChartProps {
@@ -52,10 +52,12 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
     const [resizing, setResizing] = useState<{ column: string; startX: number; startWidth: number } | null>(null);
     const [showFieldConfig, setShowFieldConfig] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
     const ganttContentRef = useRef<HTMLDivElement>(null);
+    const ganttChartRef = useRef<HTMLDivElement>(null);
 
     // Process work items into hierarchy
     useEffect(() => {
@@ -72,6 +74,21 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
     useEffect(() => {
         setCustomDateRange(null);
     }, [workItems]);
+
+    // Close export menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.gantt-export-dropdown')) {
+                setShowExportMenu(false);
+            }
+        };
+
+        if (showExportMenu) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [showExportMenu]);
 
     // Flatten hierarchy for rendering
     const flattenedItems = useMemo(() => {
@@ -175,23 +192,35 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
         }
     }, []);
 
-    const handleExport = useCallback(async () => {
+    const handleExportExcel = useCallback(async () => {
         if (isExporting) return;
         setIsExporting(true);
+        setShowExportMenu(false);
 
         try {
             const timestamp = new Date().toISOString().split('T')[0];
-            await exportService.exportToExcelWithScreenshot(
-                hierarchy,
-                ganttContentRef.current,
-                `gantt-export-${timestamp}`
-            );
+            exportService.exportToExcelOnly(hierarchy, `gantt-export-${timestamp}`);
         } catch (error) {
-            console.error('Export failed:', error);
+            console.error('Excel export failed:', error);
         } finally {
             setIsExporting(false);
         }
     }, [hierarchy, isExporting]);
+
+    const handleExportScreenshot = useCallback(async () => {
+        if (isExporting) return;
+        setIsExporting(true);
+        setShowExportMenu(false);
+
+        try {
+            const timestamp = new Date().toISOString().split('T')[0];
+            await exportService.exportScreenshotOnly(ganttChartRef.current, `gantt-export-${timestamp}-chart`);
+        } catch (error) {
+            console.error('Screenshot export failed:', error);
+        } finally {
+            setIsExporting(false);
+        }
+    }, [isExporting]);
 
     // Column resize handlers
     const handleResizeStart = useCallback((e: React.MouseEvent, column: string) => {
@@ -311,13 +340,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                 </div>
                 <div className="gantt-toolbar-right">
                     <button
-                        className="gantt-btn gantt-btn-settings"
-                        onClick={() => setShowFieldConfig(true)}
-                        title="Configure Fields"
-                    >
-                        ⚙️
-                    </button>
-                    <button
                         className="gantt-btn gantt-btn-refresh"
                         onClick={onRefresh}
                         title="Refresh Data"
@@ -345,18 +367,49 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </div>
                     <button className="gantt-btn" onClick={handleExpandAll}>Expand All</button>
                     <button className="gantt-btn" onClick={handleCollapseAll}>Collapse All</button>
+
+                    {/* Export Dropdown */}
+                    <div className="gantt-export-dropdown">
+                        <button
+                            className="gantt-btn gantt-btn-export"
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            disabled={isExporting}
+                        >
+                            {isExporting ? '⏳ Exporting...' : '📥 Export ▼'}
+                        </button>
+                        {showExportMenu && !isExporting && (
+                            <div className="gantt-export-menu">
+                                <button
+                                    className="gantt-export-menu-item"
+                                    onClick={handleExportExcel}
+                                >
+                                    📊 Export to Excel
+                                </button>
+                                <button
+                                    className="gantt-export-menu-item"
+                                    onClick={handleExportScreenshot}
+                                >
+                                    📷 Export Gantt Screenshot
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Settings Button (Rightmost) */}
                     <button
-                        className="gantt-btn gantt-btn-export"
-                        onClick={handleExport}
-                        disabled={isExporting}
+                        className="gantt-btn gantt-btn-settings"
+                        onClick={() => setShowFieldConfig(true)}
+                        title="Settings"
                     >
-                        {isExporting ? '⏳ Exporting...' : '📥 Export'}
+                        ⚙️ Settings
                     </button>
                 </div>
             </div>
 
-            {/* Headers Row */}
-            <div className="gantt-headers">
+            {/* Gantt Chart Content (for screenshot - includes headers and body) */}
+            <div className="gantt-chart-content" ref={ganttChartRef}>
+                {/* Headers Row */}
+                <div className="gantt-headers">
                 {/* Table Header */}
                 <div className="gantt-table-header" style={{ width: tableWidth, gridTemplateColumns: gridTemplate }}>
                     <div className="gantt-table-header-cell">
@@ -428,9 +481,10 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     </div>
                 </div>
             </div>
+            </div>
 
-            {/* Field Configuration Modal */}
-            <FieldConfigModal
+            {/* Settings Panel */}
+            <SettingsPanel
                 isOpen={showFieldConfig}
                 onClose={() => setShowFieldConfig(false)}
                 onSave={() => {

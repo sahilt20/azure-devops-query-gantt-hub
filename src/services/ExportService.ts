@@ -41,6 +41,29 @@ class ExportService {
     }
 
     /**
+     * Export only to Excel (no screenshot)
+     */
+    public exportToExcelOnly(
+        workItems: IWorkItemNode[],
+        filename: string = 'gantt-export'
+    ): void {
+        const flatItems = this.flattenHierarchy(workItems);
+        this.exportToExcel(flatItems, filename);
+    }
+
+    /**
+     * Export only Gantt chart screenshot (no Excel)
+     */
+    public async exportScreenshotOnly(
+        ganttElement: HTMLElement | null,
+        filename: string = 'gantt-export-chart'
+    ): Promise<void> {
+        if (ganttElement) {
+            await this.captureAndDownloadScreenshot(ganttElement, filename);
+        }
+    }
+
+    /**
      * Create and download proper Excel file with formatted data
      */
     private exportToExcel(items: IWorkItemNode[], filename: string): void {
@@ -154,40 +177,55 @@ class ExportService {
     }
 
     /**
-     * Capture full Gantt screenshot (including all scrollable content) and download as PNG
+     * Capture full Gantt screenshot (including headers, timeline, and all scrollable content) and download as PNG
      */
-    private async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
+    public async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
         try {
-            // Find the scroll container and content
-            const scrollContainer = element.closest('.gantt-scroll-container') as HTMLElement;
-            const ganttContent = element;
+            // Element should be .gantt-chart-content wrapper containing headers + scroll container
+            const ganttChartContent = element;
+            const scrollContainer = ganttChartContent.querySelector('.gantt-scroll-container') as HTMLElement;
+            const ganttScrollContent = ganttChartContent.querySelector('.gantt-scroll-content') as HTMLElement;
+            const timelineHeaderWrapper = ganttChartContent.querySelector('.gantt-timeline-header-wrapper') as HTMLElement;
 
-            if (!scrollContainer) {
-                console.warn('Could not find scroll container');
+            if (!scrollContainer || !ganttScrollContent) {
+                console.warn('Could not find scroll container or content');
                 return;
             }
 
-            // Store original styles and scroll positions
+            // Store original styles
             const originalStyles = {
+                chartContentHeight: ganttChartContent.style.height,
+                chartContentOverflow: ganttChartContent.style.overflow,
                 scrollContainerHeight: scrollContainer.style.height,
                 scrollContainerMaxHeight: scrollContainer.style.maxHeight,
                 scrollContainerOverflow: scrollContainer.style.overflow,
-                elementWidth: ganttContent.style.width,
-                elementHeight: ganttContent.style.height,
+                scrollContentWidth: ganttScrollContent.style.width,
+                scrollContentHeight: ganttScrollContent.style.height,
+                timelineHeaderOverflow: timelineHeaderWrapper ? timelineHeaderWrapper.style.overflow : '',
                 scrollLeft: scrollContainer.scrollLeft,
                 scrollTop: scrollContainer.scrollTop
             };
 
             // Calculate full content dimensions
-            const fullWidth = Math.max(ganttContent.scrollWidth, scrollContainer.scrollWidth, 1200);
-            const fullHeight = Math.max(ganttContent.scrollHeight, scrollContainer.scrollHeight, 600);
+            const fullWidth = Math.max(ganttScrollContent.scrollWidth, 1200);
+            const fullHeight = Math.max(ganttScrollContent.scrollHeight, 600);
 
-            // Temporarily expand the container to show ALL content
+            // Get headers height
+            const headersElement = ganttChartContent.querySelector('.gantt-headers') as HTMLElement;
+            const headersHeight = headersElement ? headersElement.offsetHeight : 70;
+
+            // Temporarily expand everything to show full content
+            ganttChartContent.style.height = `${fullHeight + headersHeight + 50}px`;
+            ganttChartContent.style.overflow = 'visible';
             scrollContainer.style.height = `${fullHeight + 50}px`;
             scrollContainer.style.maxHeight = 'none';
             scrollContainer.style.overflow = 'visible';
-            ganttContent.style.width = `${fullWidth}px`;
-            ganttContent.style.height = `${fullHeight}px`;
+            ganttScrollContent.style.width = `${fullWidth}px`;
+            ganttScrollContent.style.height = `${fullHeight}px`;
+
+            if (timelineHeaderWrapper) {
+                timelineHeaderWrapper.style.overflow = 'visible';
+            }
 
             // Scroll to beginning
             scrollContainer.scrollLeft = 0;
@@ -196,26 +234,38 @@ class ExportService {
             // Wait for layout to update
             await new Promise(resolve => setTimeout(resolve, 300));
 
-            // Capture the FULL content
-            const canvas = await html2canvas(ganttContent, {
+            // Determine background color based on theme
+            const isLightTheme = document.body.classList.contains('theme-light') ||
+                document.documentElement.classList.contains('theme-light');
+            const backgroundColor = isLightTheme ? '#ffffff' : '#1e1e2e';
+
+            // Capture the FULL chart including headers
+            const canvas = await html2canvas(ganttChartContent, {
                 scale: 2, // High quality
                 useCORS: true,
                 logging: false,
-                backgroundColor: '#0d0d15',
+                backgroundColor: backgroundColor,
                 width: fullWidth,
-                height: fullHeight,
+                height: fullHeight + headersHeight,
                 windowWidth: fullWidth + 100,
-                windowHeight: fullHeight + 100,
+                windowHeight: fullHeight + headersHeight + 100,
                 scrollX: 0,
                 scrollY: 0
             });
 
             // Restore original styles
+            ganttChartContent.style.height = originalStyles.chartContentHeight;
+            ganttChartContent.style.overflow = originalStyles.chartContentOverflow;
             scrollContainer.style.height = originalStyles.scrollContainerHeight;
             scrollContainer.style.maxHeight = originalStyles.scrollContainerMaxHeight;
             scrollContainer.style.overflow = originalStyles.scrollContainerOverflow;
-            ganttContent.style.width = originalStyles.elementWidth;
-            ganttContent.style.height = originalStyles.elementHeight;
+            ganttScrollContent.style.width = originalStyles.scrollContentWidth;
+            ganttScrollContent.style.height = originalStyles.scrollContentHeight;
+
+            if (timelineHeaderWrapper) {
+                timelineHeaderWrapper.style.overflow = originalStyles.timelineHeaderOverflow;
+            }
+
             scrollContainer.scrollLeft = originalStyles.scrollLeft;
             scrollContainer.scrollTop = originalStyles.scrollTop;
 

@@ -28,8 +28,13 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        // Open work item in Azure DevOps
-        azureDevOpsService.openWorkItem(workItem.id);
+        try {
+            // Open work item in Azure DevOps
+            azureDevOpsService.openWorkItem(workItem.id);
+        } catch (error) {
+            console.error('Failed to open work item:', error);
+            alert('Could not open work item details. Please ensure you are connected to Azure DevOps.');
+        }
 
         // Also call the onClick callback if provided
         if (onClick) {
@@ -80,13 +85,6 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                     className="gantt-bar-progress"
                     style={{ width: `${workItem.percentComplete}%` }}
                 />
-            )}
-
-            {/* Bar content - only show if bar is wide enough */}
-            {clampedWidth > 5 && (
-                <div className="gantt-bar-content">
-                    {clampedWidth > 15 ? workItem.title : `${workItem.percentComplete}%`}
-                </div>
             )}
         </div>
     );

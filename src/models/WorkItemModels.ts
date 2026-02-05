@@ -21,6 +21,7 @@ export interface IWorkItemNode {
     plannedHours: number;           // Planned Hours (alias for originalEstimate for clarity)
 
     // Date fields
+    createdDate: Date | null;        // System.CreatedDate - fallback if no start date
     startDate: Date | null;
     targetDate: Date | null;
     devCompletionDate: Date | null;  // Dev Completion Date for PBI/Bug
@@ -167,6 +168,7 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         remainingWork: 0,
         completedWork: 0,
         plannedHours: 0,
+        createdDate: null,
         startDate: null,
         targetDate: null,
         devCompletionDate: null,

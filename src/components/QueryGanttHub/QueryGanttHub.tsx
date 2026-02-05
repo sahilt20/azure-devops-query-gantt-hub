@@ -9,6 +9,7 @@ import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { workItemHierarchyService } from '../../services/WorkItemHierarchyService';
 import { effortRollupService } from '../../services/EffortRollupService';
 import { generateSampleWorkItems, sampleQueries } from '../../services/MockDataService';
+import { themeService, Theme } from '../../services/ThemeService';
 import { GanttChart } from '../GanttChart/GanttChart';
 import { QuerySelector } from '../QuerySelector/QuerySelector';
 import './QueryGanttHub.css';
@@ -27,6 +28,7 @@ export const QueryGanttHub: React.FC = () => {
     const [debugInfo, setDebugInfo] = React.useState<string>('');
     const [projectName, setProjectName] = React.useState<string>('');
     const [useMockData, setUseMockData] = React.useState(isDevelopment);
+    const [theme, setTheme] = React.useState<Theme>(themeService.getTheme());
 
     // Initialize SDK and load queries
     React.useEffect(() => {
@@ -234,8 +236,14 @@ export const QueryGanttHub: React.FC = () => {
         }
     }, [selectedQueryId, executeQuery, loadAllHierarchical, workItems.length]);
 
+    // Theme toggle
+    const handleThemeToggle = React.useCallback(() => {
+        const newTheme = themeService.toggleTheme();
+        setTheme(newTheme);
+    }, []);
+
     return (
-        <div className="query-gantt-hub">
+        <div className={`query-gantt-hub ${theme === 'light' ? 'theme-light' : ''}`}>
             {/* Header */}
             <div className="hub-header">
                 <div className="hub-header-left">
@@ -248,6 +256,14 @@ export const QueryGanttHub: React.FC = () => {
                     </span>
                 </div>
                 <div className="hub-header-right">
+                    {/* Theme Toggle */}
+                    <button
+                        className="hub-theme-toggle"
+                        onClick={handleThemeToggle}
+                        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+                    >
+                        {theme === 'dark' ? '☀️' : '🌙'}
+                    </button>
                     {/* Query Selector */}
                     <div className="query-selector">
                         <label>Select Query:</label>

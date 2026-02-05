@@ -47,16 +47,25 @@
     --gantt-row-bg: #ffffff;
     --gantt-row-hover: #f1f3f5;
     --gantt-border: #dee2e6;
-    --gantt-text: #212529;
-    --gantt-text-muted: #6c757d;
-    --gantt-weekend-bg: rgba(0, 0, 0, 0.02);
+    --gantt-text: #000000;
+    --gantt-text-muted: #495057;
+    --gantt-weekend-bg: rgba(0, 0, 0, 0.05);
     --gantt-today-line: #ef4444;
-    --gantt-grid-line: rgba(0, 0, 0, 0.08);
+    --gantt-grid-line: rgba(0, 0, 0, 0.1);
 
     /* Work item type colors remain the same in light theme */
     /* Progress bar colors */
-    --progress-bg: rgba(0, 0, 0, 0.05);
-    --progress-fill: linear-gradient(90deg, #4299e1, #48bb78);
+    --progress-bg: rgba(0, 0, 0, 0.1);
+    --progress-fill: linear-gradient(90deg, #3182ce, #38a169);
+}
+
+.theme-light .gantt-item-link {
+    color: #0056b3;
+    font-weight: 500;
+}
+
+.theme-light .gantt-item-link:hover {
+    color: #003d82;
 }
 
 /* Main Gantt Container */
