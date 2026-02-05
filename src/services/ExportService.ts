@@ -252,10 +252,75 @@ class ExportService {
                 scrollX: 0,
                 scrollY: 0,
                 onclone: (clonedDoc) => {
-                    // IMPORTANT: The CSS variables are likely defined on body.theme-light
-                    // We must ensure the cloned document's body has the class
+                    // CRITICAL: html2canvas may not correctly inherit CSS variables
+                    // We must ALSO set inline styles on key elements to force correct theming
                     if (isLightTheme) {
                         clonedDoc.body.classList.add('theme-light');
+
+                        // Force light theme colors on all relevant elements via inline styles
+                        // This bypasses any CSS variable inheritance issues in html2canvas
+                        const lightThemeColors = {
+                            bg: '#f8f9fa',
+                            headerBg: '#ffffff',
+                            rowBg: '#ffffff',
+                            border: '#dee2e6',
+                            text: '#000000',
+                            textMuted: '#495057'
+                        };
+
+                        // Apply to main containers
+                        const ganttChart = clonedDoc.querySelector('.gantt-chart');
+                        if (ganttChart) {
+                            (ganttChart as HTMLElement).style.backgroundColor = lightThemeColors.bg;
+                        }
+
+                        // Timeline panel (the main dark area in the screenshot)
+                        const timeline = clonedDoc.querySelector('.gantt-timeline');
+                        if (timeline) {
+                            (timeline as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        }
+
+                        // Timeline body
+                        const timelineBody = clonedDoc.querySelector('.gantt-timeline-body');
+                        if (timelineBody) {
+                            (timelineBody as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        }
+
+                        // All row backgrounds
+                        const rows = clonedDoc.querySelectorAll('.gantt-row');
+                        rows.forEach(row => {
+                            (row as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        });
+
+                        // Timeline rows
+                        const timelineRows = clonedDoc.querySelectorAll('.gantt-timeline-row');
+                        timelineRows.forEach(row => {
+                            (row as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        });
+
+                        // Table body
+                        const tableBody = clonedDoc.querySelector('.gantt-table-body');
+                        if (tableBody) {
+                            (tableBody as HTMLElement).style.backgroundColor = lightThemeColors.bg;
+                        }
+
+                        // Headers
+                        const headers = clonedDoc.querySelectorAll('.gantt-header, .gantt-timeline-header, .gantt-headers');
+                        headers.forEach(header => {
+                            (header as HTMLElement).style.backgroundColor = lightThemeColors.headerBg;
+                        });
+
+                        // Scroll containers
+                        const scrollContainer = clonedDoc.querySelector('.gantt-scroll-container');
+                        if (scrollContainer) {
+                            (scrollContainer as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        }
+
+                        // Scroll content
+                        const scrollContent = clonedDoc.querySelector('.gantt-scroll-content');
+                        if (scrollContent) {
+                            (scrollContent as HTMLElement).style.backgroundColor = lightThemeColors.rowBg;
+                        }
                     }
                 }
             });
