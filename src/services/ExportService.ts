@@ -253,11 +253,50 @@ class ExportService {
                 scrollY: 0,
                 onclone: (clonedDoc) => {
                     // CRITICAL: html2canvas may not correctly inherit CSS variables
-                    // We must ALSO set inline styles on key elements to force correct theming
+                    // We must inject CSS variable overrides AND set inline styles to force correct theming
                     if (isLightTheme) {
-                        console.log('[ExportService] Light theme detected, applying inline styles...');
+                        console.log('[ExportService] Light theme detected, injecting CSS overrides...');
 
-                        // Add theme class to both body and the main hub container
+                        // STRATEGY 1: Inject a <style> tag that overrides ALL CSS variables
+                        // This ensures any element using var(--gantt-bg) etc. gets the correct value
+                        const styleOverride = clonedDoc.createElement('style');
+                        styleOverride.textContent = `
+                            :root, body, .theme-light, .gantt-chart, .gantt-chart-content {
+                                --gantt-bg: #f8f9fa !important;
+                                --gantt-header-bg: #ffffff !important;
+                                --gantt-row-bg: #ffffff !important;
+                                --gantt-row-hover: #f1f3f5 !important;
+                                --gantt-border: #dee2e6 !important;
+                                --gantt-text: #000000 !important;
+                                --gantt-text-muted: #495057 !important;
+                                --gantt-weekend-bg: rgba(0, 0, 0, 0.05) !important;
+                                --gantt-grid-line: rgba(0, 0, 0, 0.1) !important;
+                            }
+                            .gantt-chart,
+                            .gantt-chart-content,
+                            .gantt-scroll-container,
+                            .gantt-scroll-content,
+                            .gantt-timeline,
+                            .gantt-timeline-body,
+                            .gantt-table-body {
+                                background-color: #ffffff !important;
+                            }
+                            .gantt-row,
+                            .gantt-timeline-row {
+                                background-color: #ffffff !important;
+                                border-color: #dee2e6 !important;
+                            }
+                            .gantt-headers,
+                            .gantt-table-header,
+                            .gantt-timeline-header,
+                            .gantt-timeline-header-wrapper {
+                                background-color: #ffffff !important;
+                                border-color: #dee2e6 !important;
+                            }
+                        `;
+                        clonedDoc.head.appendChild(styleOverride);
+
+                        // STRATEGY 2: Also add theme class to body and documentElement
                         clonedDoc.body.classList.add('theme-light');
                         clonedDoc.documentElement.classList.add('theme-light');
 
