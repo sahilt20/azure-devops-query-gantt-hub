@@ -26,7 +26,6 @@ export interface IWorkItemNode {
     targetDate: Date | null;
     devCompletionDate: Date | null;  // Dev Completion Date for PBI/Bug
     qaCompletionDate: Date | null;   // QA Completion Date for PBI/Bug
-    finishDate: Date | null;         // Finish Date (Microsoft.VSTS.Scheduling.FinishDate)
     iterationStartDate: Date | null; // Iteration Path start date
     iterationEndDate: Date | null;   // Iteration Path end date
 
@@ -46,7 +45,6 @@ export interface IWorkItemNode {
     calculatedStartDate: Date | null;
     calculatedEndDate: Date | null;
     hasValidDates: boolean;         // True if dates are real, false if default 2-day duration
-    isRemoved: boolean;             // True if state is "Removed"
 }
 
 /**
@@ -175,7 +173,6 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         targetDate: null,
         devCompletionDate: null,
         qaCompletionDate: null,
-        finishDate: null,
         iterationStartDate: null,
         iterationEndDate: null,
         parentId: null,
@@ -189,7 +186,6 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         calculatedStartDate: null,
         calculatedEndDate: null,
         hasValidDates: false,
-        isRemoved: false,
         ...partial
     };
 }
