@@ -48,6 +48,13 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
         return `${hours.toFixed(1)}h`;
     };
 
+    const isRemoved = workItem.isRemoved || workItem.state.toLowerCase() === 'removed';
+    const isExceeded = workItem.rollupRemainingWork > workItem.rollupEffort && workItem.rollupEffort > 0;
+
+    // Only show "No start date" if it's a leaf node without children, or if it has valid dates calc returned false
+    // relying on hasValidDates which is set in hierarchy service
+    const showNoStartDate = !workItem.hasValidDates && !workItem.startDate && workItem.children.length === 0;
+
     const hasChildren = workItem.children.length > 0;
 
     const handleTitleClick = (e: React.MouseEvent) => {
@@ -62,7 +69,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
 
     return (
         <div
-            className={`gantt-row ${typeClass}`}
+            className={`gantt-row ${typeClass}${isRemoved ? ' gantt-row-removed' : ''}`}
             style={{ gridTemplateColumns: gridTemplate }}
         >
             {/* Title with expand button and type icon */}
@@ -90,16 +97,21 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                     {typeAbbr}
                 </span>
 
-                <a
-                    className="gantt-item-title gantt-item-link"
-                    href={workItemUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`${workItem.title}\nClick to open in Azure DevOps`}
-                    onClick={handleTitleClick}
-                >
-                    {workItem.title}
-                </a>
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <a
+                        className="gantt-item-title gantt-item-link"
+                        href={workItemUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`${workItem.title}\nClick to open in Azure DevOps`}
+                        onClick={handleTitleClick}
+                    >
+                        {workItem.title}
+                    </a>
+                    {showNoStartDate && (
+                        <span className="gantt-cell-no-start-date">No start date</span>
+                    )}
+                </div>
             </div>
 
             {/* Effort (rollup) */}
@@ -108,7 +120,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
             </div>
 
             {/* Remaining */}
-            <div className="gantt-cell gantt-cell-remaining">
+            <div className={`gantt-cell gantt-cell-remaining${isExceeded ? ' exceeded' : ''}`}>
                 {formatEffort(workItem.rollupRemainingWork)}
             </div>
 

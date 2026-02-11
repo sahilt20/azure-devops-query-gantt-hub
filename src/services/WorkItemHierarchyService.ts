@@ -59,14 +59,16 @@ class WorkItemHierarchyService {
             createdDate: parseAzureDate(fields['System.CreatedDate']),
             startDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.StartDate']),
             targetDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.TargetDate']),
-            devCompletionDate: parseAzureDate(fields['Custom.DevCompletionDate'] || fields['Microsoft.VSTS.Scheduling.FinishDate']),
+            devCompletionDate: parseAzureDate(fields['Custom.DevCompletionDate']),
             qaCompletionDate: parseAzureDate(fields['Custom.QACompletionDate']),
+            finishDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.FinishDate']),
             iterationStartDate: this.parseIterationDates(fields['System.IterationPath'])?.start || null,
             iterationEndDate: this.parseIterationDates(fields['System.IterationPath'])?.end || null,
             parentId: this.parseNumber(fields['System.Parent']) || null,
             level: WorkItemTypeLevel[workItemType],
             isExpanded: true,
-            hasValidDates: false // Will be set during date calculation
+            hasValidDates: false, // Will be set during date calculation
+            isRemoved: (fields['System.State'] || '').toLowerCase() === 'removed'
         });
     }
 
@@ -227,6 +229,22 @@ class WorkItemHierarchyService {
      * Returns the first non-null calculatedStartDate or startDate found in parent chain
      * Falls back to createdDate if no parent has a start date
      */
+    /**
+     * Get best available end date from various fields
+     */
+    private getBestEndDate(node: IWorkItemNode): Date | null {
+        return node.finishDate ||
+            node.devCompletionDate ||
+            node.qaCompletionDate ||
+            node.targetDate ||
+            null;
+    }
+
+    /**
+     * Get inherited start date by traversing up the parent chain
+     * Returns the first non-null calculatedStartDate or startDate found in parent chain
+     * Falls back to createdDate if no parent has a start date
+     */
     private getInheritedStartDate(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): Date | null {
         // If node has its own start date, return it
         if (node.startDate) return node.startDate;
@@ -292,16 +310,17 @@ class WorkItemHierarchyService {
      */
     private calculateTaskDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap) || node.iterationStartDate;
+        const endDate = this.getBestEndDate(node);
         const plannedHours = node.plannedHours || node.originalEstimate || 0;
 
-        if (startDate && plannedHours > 0) {
+        if (startDate && endDate) {
+            // Has explicit start and end dates - use them directly
+            node.calculatedStartDate = startDate;
+            node.calculatedEndDate = endDate;
+            node.hasValidDates = true;
+        } else if (startDate && plannedHours > 0) {
             node.calculatedStartDate = startDate;
             node.calculatedEndDate = addWorkingHours(startDate, plannedHours);
-            node.hasValidDates = true;
-        } else if (startDate && node.targetDate) {
-            // Has start and target date
-            node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate;
             node.hasValidDates = true;
         } else if (startDate) {
             // Has only start date, estimate 1 day duration
@@ -322,13 +341,13 @@ class WorkItemHierarchyService {
      * - Default: 2 days, frame-only bar
      */
     private calculatePBIBugDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
-        const completionDate = node.devCompletionDate || node.qaCompletionDate || node.targetDate;
+        const endDate = this.getBestEndDate(node);
         const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
 
-        if (startDate && completionDate) {
+        if (startDate && endDate) {
             // Has explicit dates
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = completionDate;
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else if (node.children.length > 0) {
             // Calculate from children
@@ -338,7 +357,7 @@ class WorkItemHierarchyService {
                 node.calculatedStartDate = startDate || childDates.start;
 
                 if (childDates.end) {
-                    node.calculatedEndDate = completionDate || childDates.end;
+                    node.calculatedEndDate = endDate || childDates.end;
                 } else if (node.calculatedStartDate) {
                     // Calculate from child planned hours
                     const totalPlannedHours = node.children.reduce(
@@ -358,7 +377,7 @@ class WorkItemHierarchyService {
         } else if (startDate) {
             // Has only start date (explicit or inherited)
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = completionDate || addDays(startDate, 5);
+            node.calculatedEndDate = endDate || addDays(startDate, 5);
             node.hasValidDates = true;
         } else {
             // No dates, no children
@@ -375,18 +394,19 @@ class WorkItemHierarchyService {
      */
     private calculateFeatureEpicDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const endDate = this.getBestEndDate(node);
 
-        if (startDate && node.targetDate) {
+        if (startDate && endDate) {
             // Has explicit dates
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate;
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else if (node.children.length > 0) {
             // Calculate from children
             const childDates = this.getChildDateRange(node.children);
 
             node.calculatedStartDate = startDate || childDates.start;
-            node.calculatedEndDate = node.targetDate || childDates.end;
+            node.calculatedEndDate = endDate || childDates.end;
 
             if (node.calculatedStartDate && node.calculatedEndDate) {
                 node.hasValidDates = true;
@@ -400,7 +420,7 @@ class WorkItemHierarchyService {
         } else if (startDate) {
             // Has only start date (explicit or inherited)
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate || addDays(startDate, 30);
+            node.calculatedEndDate = endDate || addDays(startDate, 30);
             node.hasValidDates = true;
         } else {
             // No dates, no children
@@ -413,15 +433,16 @@ class WorkItemHierarchyService {
      */
     private calculateDefaultDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const endDate = this.getBestEndDate(node);
 
-        if (startDate && node.targetDate) {
+        if (startDate && endDate) {
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate;
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else if (node.children.length > 0) {
             const childDates = this.getChildDateRange(node.children);
             node.calculatedStartDate = startDate || childDates.start;
-            node.calculatedEndDate = node.targetDate || childDates.end;
+            node.calculatedEndDate = endDate || childDates.end;
             node.hasValidDates = !!(node.calculatedStartDate && node.calculatedEndDate);
         } else if (startDate) {
             node.calculatedStartDate = startDate;
@@ -451,7 +472,7 @@ class WorkItemHierarchyService {
             .filter((d): d is Date => d !== null);
 
         const childEnds = children
-            .map(c => c.calculatedEndDate || c.targetDate || c.devCompletionDate || c.qaCompletionDate)
+            .map(c => c.calculatedEndDate || this.getBestEndDate(c))
             .filter((d): d is Date => d !== null);
 
         return {

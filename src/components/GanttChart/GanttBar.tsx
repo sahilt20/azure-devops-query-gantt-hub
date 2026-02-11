@@ -23,6 +23,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
 }) => {
     const hasValidDates = startPercent >= 0 && widthPercent > 0;
     const hasRealDates = workItem.hasValidDates;
+    const isRemoved = workItem.isRemoved || workItem.state.toLowerCase() === 'removed';
 
     const typeClass = getWorkItemTypeClass(workItem.workItemType);
 
@@ -43,7 +44,18 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     };
 
     if (!hasValidDates) {
-        // Show a placeholder bar for items without dates
+        // Determine which date is missing
+        const hasStartDate = !!workItem.startDate;
+        const hasEndDate = !!(workItem.devCompletionDate || workItem.qaCompletionDate || workItem.targetDate);
+        let noDatesLabel = 'No dates';
+        if (!hasStartDate && hasEndDate) {
+            noDatesLabel = 'No start date';
+        } else if (hasStartDate && !hasEndDate) {
+            noDatesLabel = 'No end date';
+        } else if (!hasStartDate) {
+            noDatesLabel = 'No start date';
+        }
+
         return (
             <div
                 className="gantt-bar no-dates"
@@ -51,11 +63,11 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                     left: '5%',
                     width: '15%'
                 }}
-                title={`${workItem.title} - No dates set\nClick to open in Azure DevOps`}
+                title={`${workItem.title} - ${noDatesLabel}\nClick to open in Azure DevOps`}
                 onClick={handleClick}
             >
                 <div className="gantt-bar-content">
-                    No dates
+                    {noDatesLabel}
                 </div>
             </div>
         );
@@ -70,7 +82,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
 
     return (
         <div
-            className={`gantt-bar ${typeClass} ${isFrameOnly ? 'no-dates' : ''}`}
+            className={`gantt-bar ${typeClass} ${isFrameOnly ? 'no-dates' : ''}${isRemoved ? ' gantt-bar-removed' : ''}`}
             style={{
                 left: `${clampedStart}%`,
                 width: `${clampedWidth}%`,
