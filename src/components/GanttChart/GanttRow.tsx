@@ -8,6 +8,7 @@ import React from 'react';
 import { IWorkItemNode } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { getWorkItemTypeClass, getWorkItemTypeAbbreviation, getCustomTypeColor, isCustomType } from '../../utils/WorkItemTypeUtils';
+import { effortRollupService } from '../../services/EffortRollupService';
 
 interface IColumnWidths {
     title: number;
@@ -38,6 +39,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     const typeAbbr = getWorkItemTypeAbbreviation(workItem.workItemType);
     const isCustom = isCustomType(workItem.workItemType);
     const customColor = isCustom ? getCustomTypeColor(workItem.workItemType) : undefined;
+    const isRemoved = effortRollupService.isRemovedState(workItem.state);
 
 
 
@@ -62,7 +64,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
 
     return (
         <div
-            className={`gantt-row ${typeClass}`}
+            className={`gantt-row ${typeClass} ${isRemoved ? 'gantt-row-removed' : ''}`}
             style={{ gridTemplateColumns: gridTemplate }}
         >
             {/* Title with expand button and type icon */}
@@ -108,7 +110,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
             </div>
 
             {/* Remaining */}
-            <div className="gantt-cell gantt-cell-remaining">
+            <div className={`gantt-cell gantt-cell-remaining ${workItem.rollupRemainingWork > workItem.rollupEffort && workItem.rollupEffort > 0 ? 'remaining-over' : ''}`}>
                 {formatEffort(workItem.rollupRemainingWork)}
             </div>
 

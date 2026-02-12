@@ -117,11 +117,31 @@ class EffortRollupService {
             // Calculate weighted percent complete based on effort
             node.percentComplete = this.calculateWeightedPercent(childTasks);
         } else {
-            // No child tasks, use own values or effort field
-            node.rollupEffort = node.effort || 0;
-            node.rollupRemainingWork = 0;
-            node.rollupCompletedWork = this.calculateCompletedFromState(node);
-            node.percentComplete = this.calculatePercentFromState(node);
+            // No child tasks - treat like a leaf item using its own effort/remaining fields
+            node.rollupEffort = node.plannedHours || node.originalEstimate || node.effort || 0;
+            node.rollupRemainingWork = node.remainingWork || 0;
+
+            // If effort exists but no remaining work is explicitly set, infer from state
+            if (node.rollupEffort > 0 && node.remainingWork === 0) {
+                if (this.isDoneState(node.state.toLowerCase())) {
+                    node.rollupRemainingWork = 0;
+                } else if (this.isActiveState(node.state.toLowerCase())) {
+                    node.rollupRemainingWork = node.rollupEffort * 0.5;
+                } else {
+                    // Not started - remaining = full effort
+                    node.rollupRemainingWork = node.rollupEffort;
+                }
+            }
+
+            node.rollupCompletedWork = node.completedWork || (node.rollupEffort - node.rollupRemainingWork);
+
+            // Calculate percent complete
+            if (node.rollupEffort > 0) {
+                node.percentComplete = Math.round(100 - (node.rollupRemainingWork * 100 / node.rollupEffort));
+                node.percentComplete = Math.max(0, Math.min(100, node.percentComplete));
+            } else {
+                node.percentComplete = this.calculatePercentFromState(node);
+            }
         }
     }
 
@@ -217,8 +237,15 @@ class EffortRollupService {
      * Check if a state represents "done"
      */
     private isDoneState(state: string): boolean {
-        const doneStates = ['done', 'closed', 'completed', 'resolved', 'removed'];
+        const doneStates = ['done', 'closed', 'completed', 'resolved'];
         return doneStates.some(s => state.includes(s));
+    }
+
+    /**
+     * Check if a state represents "removed"
+     */
+    public isRemovedState(state: string): boolean {
+        return state.toLowerCase().includes('removed');
     }
 
     /**
@@ -279,11 +306,9 @@ class EffortRollupService {
             itemCount += this.countItems(node);
         }
 
-        // Calculate overall percent based on Remaining Work vs Effort
-        // Formula: % Done = (Effort - Remaining) / Effort * 100
-        const overallPercent = totalEffort > 0
-            ? Math.round(((totalEffort - totalRemaining) / totalEffort) * 100)
-            : 0;
+        // Calculate overall percent using the same weighted percent formula
+        // as Epic/Feature rollup, so they match when there's a single root item
+        const overallPercent = this.calculateWeightedPercent(nodes);
 
         // Ensure percent is within bounds [0, 100]
         const boundedPercent = Math.max(0, Math.min(100, overallPercent));

@@ -292,16 +292,17 @@ class WorkItemHierarchyService {
      */
     private calculateTaskDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap) || node.iterationStartDate;
-        const plannedHours = node.plannedHours || node.originalEstimate || 0;
+        const plannedHours = node.plannedHours || node.originalEstimate || node.effort || 0;
+        const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
         if (startDate && plannedHours > 0) {
             node.calculatedStartDate = startDate;
             node.calculatedEndDate = addWorkingHours(startDate, plannedHours);
             node.hasValidDates = true;
-        } else if (startDate && node.targetDate) {
-            // Has start and target date
+        } else if (startDate && endDate) {
+            // Has start and an end date
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate;
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else if (startDate) {
             // Has only start date, estimate 1 day duration
@@ -342,7 +343,7 @@ class WorkItemHierarchyService {
                 } else if (node.calculatedStartDate) {
                     // Calculate from child planned hours
                     const totalPlannedHours = node.children.reduce(
-                        (sum, child) => sum + (child.plannedHours || child.originalEstimate || 0),
+                        (sum, child) => sum + (child.plannedHours || child.originalEstimate || child.effort || 0),
                         0
                     );
                     if (totalPlannedHours > 0) {
@@ -358,7 +359,20 @@ class WorkItemHierarchyService {
         } else if (startDate) {
             // Has only start date (explicit or inherited)
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = completionDate || addDays(startDate, 5);
+            // Use own planned hours to calculate end date if available
+            const plannedHours = node.plannedHours || node.originalEstimate || node.effort || 0;
+            if (completionDate) {
+                node.calculatedEndDate = completionDate;
+            } else if (plannedHours > 0) {
+                node.calculatedEndDate = addWorkingHours(startDate, plannedHours);
+            } else {
+                node.calculatedEndDate = addDays(startDate, 5);
+            }
+            node.hasValidDates = true;
+        } else if (completionDate) {
+            // Has only end date, estimate start
+            node.calculatedStartDate = addDays(completionDate, -5);
+            node.calculatedEndDate = completionDate;
             node.hasValidDates = true;
         } else {
             // No dates, no children
@@ -375,18 +389,19 @@ class WorkItemHierarchyService {
      */
     private calculateFeatureEpicDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
-        if (startDate && node.targetDate) {
+        if (startDate && endDate) {
             // Has explicit dates
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate;
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else if (node.children.length > 0) {
             // Calculate from children
             const childDates = this.getChildDateRange(node.children);
 
             node.calculatedStartDate = startDate || childDates.start;
-            node.calculatedEndDate = node.targetDate || childDates.end;
+            node.calculatedEndDate = endDate || childDates.end;
 
             if (node.calculatedStartDate && node.calculatedEndDate) {
                 node.hasValidDates = true;
@@ -400,7 +415,12 @@ class WorkItemHierarchyService {
         } else if (startDate) {
             // Has only start date (explicit or inherited)
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate || addDays(startDate, 30);
+            node.calculatedEndDate = endDate || addDays(startDate, 30);
+            node.hasValidDates = true;
+        } else if (endDate) {
+            // Has only end date, estimate start
+            node.calculatedStartDate = addDays(endDate, -30);
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else {
             // No dates, no children
@@ -413,19 +433,24 @@ class WorkItemHierarchyService {
      */
     private calculateDefaultDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
-        if (startDate && node.targetDate) {
+        if (startDate && endDate) {
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = node.targetDate;
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else if (node.children.length > 0) {
             const childDates = this.getChildDateRange(node.children);
             node.calculatedStartDate = startDate || childDates.start;
-            node.calculatedEndDate = node.targetDate || childDates.end;
+            node.calculatedEndDate = endDate || childDates.end;
             node.hasValidDates = !!(node.calculatedStartDate && node.calculatedEndDate);
         } else if (startDate) {
             node.calculatedStartDate = startDate;
-            node.calculatedEndDate = addDays(startDate, 2);
+            node.calculatedEndDate = endDate || addDays(startDate, 2);
+            node.hasValidDates = true;
+        } else if (endDate) {
+            node.calculatedStartDate = addDays(endDate, -2);
+            node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else {
             this.setDefaultDates(node);

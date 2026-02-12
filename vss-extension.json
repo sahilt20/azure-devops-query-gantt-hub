@@ -1,9 +1,9 @@
 {
     "manifestVersion": 1,
     "id": "query-gantt-hub",
-    "version": "1.2.23",
+    "version": "1.2.32",
     "name": "Query Gantt Chart",
-    "description": "Adds a Gantt Chart view to Azure DevOps Queries with effort rollup from Epic → Feature → PBI → Task",
+    "description": "Gantt Chart hub for Azure DevOps with automatic effort rollup, percent complete, timeline visualization, and export support for Epic, Feature, PBI, Bug, and Task hierarchies.",
     "publisher": "SahilTanwar",
     "categories": [
         "Azure Boards"
@@ -17,12 +17,16 @@
         "default": "static/images/gantt-icon.png"
     },
     "scopes": [
-        "vso.work",
-        "vso.work_full"
+        "vso.work"
     ],
     "demands": [
         "contribution/ms.vss-web.platform-common"
     ],
+    "content": {
+        "details": {
+            "path": "overview.md"
+        }
+    },
     "contributions": [
         {
             "id": "query-gantt-hub",
@@ -48,6 +52,10 @@
         },
         {
             "path": "static",
+            "addressable": true
+        },
+        {
+            "path": "overview.md",
             "addressable": true
         }
     ]

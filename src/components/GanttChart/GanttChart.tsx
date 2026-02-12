@@ -333,7 +333,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                             <span className="gantt-stat-value">{stats.totalRemaining}h</span>
                         </span>
                         <span className="gantt-stat">
-                            <span>Overall:</span>
+                            <span>Overall Done:</span>
                             <span className="gantt-stat-value">{stats.overallPercent}%</span>
                         </span>
                     </div>

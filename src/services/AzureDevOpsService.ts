@@ -367,7 +367,6 @@ class AzureDevOpsService {
             FROM WorkItems
             WHERE [System.TeamProject] = @project
                 AND [System.WorkItemType] IN ('Epic', 'Feature', 'Product Backlog Item', 'User Story', 'Task', 'Bug')
-                AND [System.State] <> 'Removed'
             ORDER BY [System.WorkItemType], [System.Id]
         `;
 

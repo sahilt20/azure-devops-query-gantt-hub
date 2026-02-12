@@ -7,6 +7,7 @@ import React from 'react';
 import { IWorkItemNode, WorkItemTypeColors } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { getWorkItemTypeClass } from '../../utils/WorkItemTypeUtils';
+import { effortRollupService } from '../../services/EffortRollupService';
 
 interface IGanttBarProps {
     workItem: IWorkItemNode;
@@ -23,6 +24,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
 }) => {
     const hasValidDates = startPercent >= 0 && widthPercent > 0;
     const hasRealDates = workItem.hasValidDates;
+    const isRemoved = effortRollupService.isRemovedState(workItem.state);
 
     const typeClass = getWorkItemTypeClass(workItem.workItemType);
 
@@ -43,7 +45,10 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     };
 
     if (!hasValidDates) {
-        // Show a placeholder bar for items without dates
+        const hasStartDate = !!(workItem.startDate);
+        const noDateLabel = hasStartDate ? '' : 'No start date';
+
+        // Show a placeholder bar for items without start dates
         return (
             <div
                 className="gantt-bar no-dates"
@@ -51,12 +56,14 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                     left: '5%',
                     width: '15%'
                 }}
-                title={`${workItem.title} - No dates set\nClick to open in Azure DevOps`}
+                title={`${workItem.title}${noDateLabel ? ' - ' + noDateLabel : ''}\nClick to open in Azure DevOps`}
                 onClick={handleClick}
             >
-                <div className="gantt-bar-content">
-                    No dates
-                </div>
+                {noDateLabel && (
+                    <div className="gantt-bar-content">
+                        {noDateLabel}
+                    </div>
+                )}
             </div>
         );
     }
@@ -70,7 +77,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
 
     return (
         <div
-            className={`gantt-bar ${typeClass} ${isFrameOnly ? 'no-dates' : ''}`}
+            className={`gantt-bar ${typeClass} ${isFrameOnly ? 'no-dates' : ''} ${isRemoved ? 'gantt-bar-removed' : ''}`}
             style={{
                 left: `${clampedStart}%`,
                 width: `${clampedWidth}%`,
@@ -85,6 +92,12 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                     className="gantt-bar-progress"
                     style={{ width: `${workItem.percentComplete}%` }}
                 />
+            )}
+            {/* Show label text for frame-only bars without start date */}
+            {isFrameOnly && !workItem.startDate && (
+                <div className="gantt-bar-content">
+                    No start date
+                </div>
             )}
         </div>
     );

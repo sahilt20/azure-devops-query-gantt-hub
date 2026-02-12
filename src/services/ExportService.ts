@@ -82,7 +82,7 @@ class ExportService {
             ['Total Effort (hours)', stats.totalEffort],
             ['Remaining Work (hours)', stats.totalRemaining],
             ['Completed Work (hours)', stats.totalCompleted],
-            ['Overall Progress', `${stats.overallProgress}%`],
+            ['Overall Done', `${stats.overallProgress}%`],
             ['Export Date', new Date().toLocaleDateString()]
         ];
 

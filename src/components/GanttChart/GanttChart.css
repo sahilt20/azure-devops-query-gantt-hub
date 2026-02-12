@@ -591,8 +591,30 @@
     font-size: 12px;
 }
 
+.gantt-cell-remaining.remaining-over {
+    color: #ef4444;
+    font-weight: 600;
+}
+
 .gantt-cell-percent {
     font-weight: 600;
+}
+
+/* Removed items - gray out and cross out */
+.gantt-row-removed {
+    opacity: 0.5;
+}
+
+.gantt-row-removed .gantt-item-title {
+    text-decoration: line-through;
+    color: var(--gantt-text-muted);
+}
+
+.gantt-row-removed .gantt-cell-effort,
+.gantt-row-removed .gantt-cell-remaining,
+.gantt-row-removed .gantt-cell-percent {
+    color: var(--gantt-text-muted);
+    text-decoration: line-through;
 }
 
 /* Timeline Row - Fixed alignment to match table rows */
@@ -780,6 +802,18 @@
 
 .gantt-bar.no-dates .gantt-bar-progress {
     display: none;
+}
+
+/* Removed items - gray out bar */
+.gantt-bar.gantt-bar-removed {
+    background: rgba(113, 128, 150, 0.15) !important;
+    border: 1px dashed rgba(113, 128, 150, 0.4) !important;
+    opacity: 0.5;
+}
+
+.gantt-bar.gantt-bar-removed .gantt-bar-progress {
+    background-color: var(--color-unknown) !important;
+    opacity: 0.4;
 }
 
 /* Loading State */
