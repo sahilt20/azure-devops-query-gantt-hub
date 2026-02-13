@@ -104,32 +104,32 @@ The following diagram illustrates the core data flow and logic of the extension,
 ```mermaid
 graph TD
     %% Nodes
-    Init([Extension Initialization])
-    SDK[Azure DevOps SDK]
-    Query{Query Type?}
+    Init(["Extension Initialization"])
+    SDK["Azure DevOps SDK"]
+    Query{"Query Type?"}
     
     subgraph Data Fetching
-        GetQueries[Get Saved Queries]
-        ExecQuery[Execute Selected Query]
-        FetchWI[Fetch Work Items (Details)]
-        FetchRel[Fetch Work Item Relations]
+        GetQueries["Get Saved Queries"]
+        ExecQuery["Execute Selected Query"]
+        FetchWI["Fetch Work Items (Details)"]
+        FetchRel["Fetch Work Item Relations"]
     end
 
     subgraph Hierarchy Builder
-        BuildTree[Build Hierarchy Tree]
-        RelLogic[Map Parent-Child Relations]
-        Sort[Sort by Level & ID]
+        BuildTree["Build Hierarchy Tree"]
+        RelLogic["Map Parent-Child Relations"]
+        Sort["Sort by Level & ID"]
     end
 
     subgraph Logic Services
-        DateCalc[Date Calculation Service]
-        EffortCalc[Effort Rollup Service]
+        DateCalc["Date Calculation Service"]
+        EffortCalc["Effort Rollup Service"]
     end
     
     subgraph UI Rendering
-        GanttView[Gantt Chart View]
-        ResView[Resource Allocation View]
-        Theme[Theme Service]
+        GanttView["Gantt Chart View"]
+        ResView["Resource Allocation View"]
+        Theme["Theme Service"]
     end
 
     %% Flow
@@ -156,8 +156,8 @@ graph TD
     
     %% Detailed Logic - Dates
     subgraph Date Rules
-        D1[Start: Explicit -> Inherited -> Created]
-        D2[End: Explicit -> Derived from Children -> Derived from Effort]
+        D1["Start: Explicit -> Inherited -> Created"]
+        D2["End: Explicit -> Derived from Children -> Derived from Effort"]
         D1 --> D2
     end
     
@@ -165,9 +165,9 @@ graph TD
     
     %% Detailed Logic - Effort
     subgraph Rollup Rules
-        R1[Effort: Sum of Children]
-        R2[Remaining: Sum of Children]
-        R3[Done %: (1 - Remaining/Effort) * 100]
+        R1["Effort: Sum of Children"]
+        R2["Remaining: Sum of Children"]
+        R3["Done %: (1 - Remaining/Effort) * 100"]
         R1 --> R2 --> R3
     end
     
