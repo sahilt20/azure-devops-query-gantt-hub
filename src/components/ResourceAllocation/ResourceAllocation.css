@@ -1,0 +1,133 @@
+/**
+ * Resource Allocation Component Styles
+ */
+
+.resource-allocation {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--gantt-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--gantt-text);
+}
+
+.resource-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.resource-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.resource-table th {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gantt-text-muted);
+    border-bottom: 2px solid var(--gantt-border);
+    position: sticky;
+    top: 0;
+    background: var(--gantt-bg);
+    z-index: 10;
+}
+
+.resource-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gantt-border);
+    vertical-align: middle;
+}
+
+.resource-row:hover {
+    background: var(--gantt-row-hover);
+}
+
+/* User Column */
+.resource-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.resource-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4299e1, #667eea);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.resource-name {
+    font-weight: 500;
+    font-size: 14px;
+}
+
+/* Stats Columns */
+.resource-stat {
+    font-variant-numeric: tabular-nums;
+}
+
+.resource-stat-value {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.resource-stat-label {
+    font-size: 11px;
+    color: var(--gantt-text-muted);
+    margin-left: 4px;
+}
+
+/* Progress Bar Column */
+.resource-progress-cell {
+    width: 30%;
+    min-width: 200px;
+}
+
+.resource-progress-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.resource-progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--gantt-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.resource-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4299e1, #48bb78);
+    border-radius: 4px;
+}
+
+.resource-progress-text {
+    font-size: 13px;
+    font-weight: 600;
+    width: 40px;
+    text-align: right;
+}
+
+/* Empty State */
+.resource-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--gantt-text-muted);
+    font-style: italic;
+}

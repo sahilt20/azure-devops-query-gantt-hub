@@ -96,3 +96,106 @@ A Gantt Chart hub for Azure DevOps that visualizes work items from any saved que
 ## Required Scopes
 
 - `vso.work` - Read work items and queries
+
+## Extension Logic Flow
+
+The following diagram illustrates the core data flow and logic of the extension, from initialization to rendering the Gantt chart and Resource view.
+
+```mermaid
+graph TD
+    %% Nodes
+    Init([Extension Initialization])
+    SDK[Azure DevOps SDK]
+    Query{Query Type?}
+    
+    subgraph Data Fetching
+        GetQueries[Get Saved Queries]
+        ExecQuery[Execute Selected Query]
+        FetchWI[Fetch Work Items (Details)]
+        FetchRel[Fetch Work Item Relations]
+    end
+
+    subgraph Hierarchy Builder
+        BuildTree[Build Hierarchy Tree]
+        RelLogic[Map Parent-Child Relations]
+        Sort[Sort by Level & ID]
+    end
+
+    subgraph Logic Services
+        DateCalc[Date Calculation Service]
+        EffortCalc[Effort Rollup Service]
+    end
+    
+    subgraph UI Rendering
+        GanttView[Gantt Chart View]
+        ResView[Resource Allocation View]
+        Theme[Theme Service]
+    end
+
+    %% Flow
+    Init --> SDK
+    SDK --> GetQueries
+    GetQueries -->|User Selects Query| ExecQuery
+    
+    ExecQuery -->|Flat Query| FetchWI
+    ExecQuery -->|Tree/Link Query| FetchRel
+    FetchRel --> FetchWI
+    
+    FetchWI --> BuildTree
+    
+    BuildTree --> Query
+    Query -->|Tree| RelLogic
+    Query -->|Flat| RelLogic
+    RelLogic --> Sort
+    
+    Sort --> DateCalc
+    DateCalc --> EffortCalc
+    
+    EffortCalc --> GanttView
+    EffortCalc --> ResView
+    
+    %% Detailed Logic - Dates
+    subgraph Date Rules
+        D1[Start: Explicit -> Inherited -> Created]
+        D2[End: Explicit -> Derived from Children -> Derived from Effort]
+        D1 --> D2
+    end
+    
+    DateCalc -.-> D1
+    
+    %% Detailed Logic - Effort
+    subgraph Rollup Rules
+        R1[Effort: Sum of Children]
+        R2[Remaining: Sum of Children]
+        R3[Done %: (1 - Remaining/Effort) * 100]
+        R1 --> R2 --> R3
+    end
+    
+    EffortCalc -.-> R1
+
+    %% Styling
+    Theme -.-> GanttView
+    Theme -.-> ResView
+```
+
+### Key Logic Explanations
+
+1.  **Hierarchy Generation**:
+    *   The extension fetches work items based on the selected query.
+    *   `WorkItemHierarchyService` constructs a tree structure (Epic -> Feature -> PBI -> Task) based on parent-child links.
+    *   Orphan items in tree queries are placed at the root level.
+
+2.  **Date Resolution**:
+    *   **Start Date**: Uses `Start Date` field. If missing, it inherits from the parent. If still missing, falls back to `Created Date`.
+    *   **End Date**: Uses `Target Date`, `Due Date`, or `Finish Date`.
+    *   **Inference**: If dates are missing, the extension estimates duration based on `Original Estimate` (Planned Hours) or child item dates.
+    *   **Dotted Bars**: If an item has no planned effort and no explicit dates, it renders as a dotted bar to indicate uncertainty.
+
+3.  **Effort Rollup**:
+    *   Values bubble up from **Task** level to **PBI**, **Feature**, and **Epic**.
+    *   `Effort` (Planned) and `Remaining Work` are summed up the tree.
+    *   `Done %` is calculated at each level based on the aggregated values: `100 - (Remaining / Effort * 100)`.
+
+4.  **Resource Allocation**:
+    *   The extension flattens the hierarchy and groups items by `Assigned To`.
+    *   It aggregates Planned and Remaining effort per user to visualize workload.

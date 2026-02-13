@@ -72,7 +72,8 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     const clampedStart = Math.max(0, Math.min(100 - 1, startPercent));
     const clampedWidth = Math.max(1, Math.min(100 - clampedStart, widthPercent));
 
-    // Determine if this is a frame-only bar (default 2-day duration)
+    // Determine if this is a frame-only bar (dotted style)
+    // Only show dotted if we truly couldn't find valid dates (even inherited ones)
     const isFrameOnly = !hasRealDates;
 
     return (
