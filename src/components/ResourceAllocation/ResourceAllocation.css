@@ -14,6 +14,14 @@
     color: var(--gantt-text);
 }
 
+.resource-header-note {
+    padding: 12px 20px;
+    font-size: 12px;
+    color: var(--gantt-text-muted);
+    border-bottom: 1px solid var(--gantt-border);
+    background: linear-gradient(90deg, rgba(66, 153, 225, 0.12), rgba(102, 126, 234, 0.04));
+}
+
 .resource-list-container {
     flex: 1;
     overflow-y: auto;
@@ -36,6 +44,10 @@
     top: 0;
     background: var(--gantt-bg);
     z-index: 10;
+}
+
+.resource-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .resource-table td {
@@ -113,6 +125,7 @@
     height: 100%;
     background: linear-gradient(90deg, #4299e1, #48bb78);
     border-radius: 4px;
+    transition: width 0.3s ease;
 }
 
 .resource-progress-text {

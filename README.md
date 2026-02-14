@@ -26,6 +26,8 @@ A custom Azure DevOps extension that adds a **Gantt Chart** hub to visualize wor
 - 🎨 **Modern UI** - Dark theme with smooth animations and glassmorphism effects
 - 📅 **Multiple View Modes** - Day, Week, and Month timeline views with dynamic scaling
 - ⚙️ **Configurable Fields** - Choose which fields to use for effort calculations
+- 🧭 **Delivery Analysis Tab** - Delivery-manager insights for risk, owner load, and next actions
+- 👥 **Task-Only Resource Allocation** - Allocation totals are calculated from Task items only (no parent rollup double-counting)
 
 ## Work Item Hierarchy
 
@@ -41,6 +43,13 @@ Epic (Level 0)
 - **Tasks**: Use configurable fields (default: `Original Estimate`, `Remaining Work`)
 - **Parent Items**: Sum of all descendant effort values
 - **Done %**: Automatically calculated as `100 - (Remaining Work / Effort × 100)`
+
+## Start Date Resolution Logic
+
+- **Primary**: Work item's own `Start Date`
+- **Fallback 1**: Closest parent `Start Date` (walks up parent chain)
+- **Fallback 2**: Work item's `Created Date` if no ancestor has start date
+- This ensures timeline bars remain anchored even when Start Date is missing on the current item
 
 ## Installation
 
@@ -108,6 +117,10 @@ The extension requires the following Azure DevOps scopes:
    - Work item hierarchy on the left
    - Timeline with progress bars on the right
    - Effort rollup and percent complete for each item
+5. Switch between tabs:
+   - **Gantt Chart** for timeline view
+   - **Resource Allocation** for task-only workload by owner
+   - **Delivery Analysis** for delivery-manager risk and action insights
 
 ### Toolbar Controls
 
@@ -118,6 +131,7 @@ The extension requires the following Azure DevOps scopes:
 | **🔄 Refresh**      | Reload data from Azure DevOps |
 | **Expand All**     | Expand entire hierarchy       |
 | **Collapse All**   | Collapse to top level         |
+| **Tabs**           | Gantt Chart, Resource Allocation, Delivery Analysis |
 
 ## Project Structure
 
@@ -137,6 +151,12 @@ azure-devops-query-ui-hub/
 │   │   ├── FieldConfig/
 │   │   │   ├── FieldConfigModal.tsx  # Field settings modal
 │   │   │   └── FieldConfigModal.css  # Modal styles
+│   │   ├── ResourceAllocation/
+│   │   │   ├── ResourceAllocation.tsx # Task-only allocation view
+│   │   │   └── ResourceAllocation.css # Allocation styles
+│   │   ├── DeliveryAnalysis/
+│   │   │   ├── DeliveryAnalysis.tsx # Delivery-manager analysis tab
+│   │   │   └── DeliveryAnalysis.css # Analysis styles
 │   │   └── QueryGanttHub/
 │   │       ├── QueryGanttHub.tsx  # Main hub component
 │   │       └── QueryGanttHub.css  # Hub styles

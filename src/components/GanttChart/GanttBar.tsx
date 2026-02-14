@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { IWorkItemNode, WorkItemTypeColors } from '../../models/WorkItemModels';
+import { IWorkItemNode } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { getWorkItemTypeClass } from '../../utils/WorkItemTypeUtils';
 import { effortRollupService } from '../../services/EffortRollupService';
@@ -22,9 +22,11 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     widthPercent,
     onClick
 }) => {
-    const hasValidDates = startPercent >= 0 && widthPercent > 0;
+    const hasTimelinePosition = startPercent >= 0 && widthPercent >= 0;
     const hasRealDates = workItem.hasValidDates;
     const isRemoved = effortRollupService.isRemovedState(workItem.state);
+    const effectiveStartDate = workItem.calculatedStartDate || workItem.startDate || workItem.createdDate;
+    const hasResolvedStartDate = !!effectiveStartDate;
 
     const typeClass = getWorkItemTypeClass(workItem.workItemType);
 
@@ -44,14 +46,13 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
         }
     };
 
-    if (!hasValidDates) {
-        const hasStartDate = !!(workItem.startDate);
-        const noDateLabel = hasStartDate ? '' : 'No start date';
+    if (!hasTimelinePosition) {
+        const noDateLabel = hasResolvedStartDate ? '' : 'No start date';
 
-        // Show a placeholder bar for items without start dates
+        // Show a placeholder bar for items that still cannot be positioned on the timeline
         return (
             <div
-                className="gantt-bar no-dates"
+                className={`gantt-bar ${hasResolvedStartDate ? '' : 'no-dates'}`}
                 style={{
                     left: '5%',
                     width: '15%'
@@ -72,9 +73,8 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     const clampedStart = Math.max(0, Math.min(100 - 1, startPercent));
     const clampedWidth = Math.max(1, Math.min(100 - clampedStart, widthPercent));
 
-    // Determine if this is a frame-only bar (dotted style)
-    // Only show dotted if we truly couldn't find valid dates (even inherited ones)
-    const isFrameOnly = !hasRealDates;
+    // Only show a frame-only bar when we truly have no resolved start date
+    const isFrameOnly = !hasRealDates && !hasResolvedStartDate;
 
     return (
         <div
@@ -95,7 +95,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                 />
             )}
             {/* Show label text for frame-only bars without start date */}
-            {isFrameOnly && !workItem.startDate && (
+            {isFrameOnly && !hasResolvedStartDate && (
                 <div className="gantt-bar-content">
                     No start date
                 </div>

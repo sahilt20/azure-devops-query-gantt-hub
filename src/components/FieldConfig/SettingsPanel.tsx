@@ -212,9 +212,9 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                     <h5>Tasks</h5>
                                     <ul>
                                         <li>Uses Start Date + Planned Hours (7-hour working day)</li>
-                                        <li>Falls back to inherited start date from parent + Planned Hours</li>
+                                        <li>Falls back to parent-chain start date + Planned Hours</li>
                                         <li>Falls back to Iteration Path start + Planned Hours</li>
-                                        <li>Falls back to Created Date</li>
+                                        <li>Falls back to Created Date if no ancestor has a start date</li>
                                     </ul>
 
                                     <h5>PBIs & Bugs</h5>
@@ -235,16 +235,22 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
 
                                     <h4>Start Date Inheritance</h4>
                                     <p>
-                                        <strong>Important:</strong> If a work item doesn't have an explicit start date, it inherits from its parent work item.
-                                        This inheritance continues up the hierarchy until a start date is found.
+                                        <strong>Important:</strong> Start date resolution follows a strict chain:
+                                        <code>Own Start Date → Parent Start Date (recursive) → Work Item Created Date</code>.
                                     </p>
                                     <p>
-                                        For example: If a Task has no start date, it checks its parent PBI. If the PBI has no start date,
-                                        it checks the parent Feature, and so on. If no ancestor has a start date, the work item's Created Date is used.
+                                        For example: If a Task has no start date, it checks parent PBI, then Feature, then Epic.
+                                        If no ancestor has a start date, the task's Created Date is used as the timeline start.
                                     </p>
                                     <p>
-                                        This ensures that work items without explicit dates still appear in a reasonable timeline position.
+                                        This keeps bars anchored on the timeline even when Start Date is missing on the current item.
                                     </p>
+
+                                    <h4>Operational Tabs</h4>
+                                    <ul>
+                                        <li><strong>Resource Allocation:</strong> Task-only workload view (parent items excluded)</li>
+                                        <li><strong>Delivery Analysis:</strong> Delivery-manager view with risk, ownership, and action insights</li>
+                                    </ul>
 
                                     <h4>Timeline Scaling</h4>
                                     <p>

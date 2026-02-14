@@ -223,28 +223,28 @@ class WorkItemHierarchyService {
     }
 
     /**
-     * Get inherited start date by traversing up the parent chain
-     * Returns the first non-null calculatedStartDate or startDate found in parent chain
-     * Falls back to createdDate if no parent has a start date
+     * Resolve effective start date with strict fallback order:
+     * 1) own start date
+     * 2) nearest ancestor start date (or already-calculated start)
+     * 3) own created date
      */
-    private getInheritedStartDate(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): Date | null {
-        // If node has its own start date, return it
+    private resolveStartDate(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): Date | null {
         if (node.startDate) return node.startDate;
 
-        // Traverse up parent chain
+        const visited = new Set<number>([node.id]);
         let currentNode = node;
+
         while (currentNode.parentId) {
             const parent = nodeMap.get(currentNode.parentId);
-            if (!parent) break;
+            if (!parent || visited.has(parent.id)) break;
 
-            // Check if parent has a calculated or explicit start date
             if (parent.calculatedStartDate) return parent.calculatedStartDate;
             if (parent.startDate) return parent.startDate;
 
+            visited.add(parent.id);
             currentNode = parent;
         }
 
-        // No parent with start date found - use created date as fallback
         return node.createdDate;
     }
 
@@ -291,7 +291,7 @@ class WorkItemHierarchyService {
      * - Default: 2 days, frame-only bar
      */
     private calculateTaskDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap) || node.iterationStartDate;
+        const startDate = this.resolveStartDate(node, nodeMap) || node.iterationStartDate;
         const plannedHours = node.plannedHours || node.originalEstimate || node.effort || 0;
         const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
@@ -324,7 +324,7 @@ class WorkItemHierarchyService {
      */
     private calculatePBIBugDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const completionDate = node.devCompletionDate || node.qaCompletionDate || node.targetDate;
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const startDate = this.resolveStartDate(node, nodeMap);
 
         if (startDate && completionDate) {
             // Has explicit dates
@@ -388,7 +388,7 @@ class WorkItemHierarchyService {
      * - Default: 2 days, frame-only bar
      */
     private calculateFeatureEpicDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const startDate = this.resolveStartDate(node, nodeMap);
         const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
         if (startDate && endDate) {
@@ -432,7 +432,7 @@ class WorkItemHierarchyService {
      * Calculate dates for unknown work item types
      */
     private calculateDefaultDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const startDate = this.resolveStartDate(node, nodeMap);
         const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
         if (startDate && endDate) {
@@ -461,10 +461,10 @@ class WorkItemHierarchyService {
      * Set default 2-day duration (frame-only bar)
      */
     private setDefaultDates(node: IWorkItemNode): void {
-        const today = new Date();
-        node.calculatedStartDate = node.startDate || today;
+        const fallbackStart = node.startDate || node.createdDate || new Date();
+        node.calculatedStartDate = fallbackStart;
         node.calculatedEndDate = addDays(node.calculatedStartDate, 2);
-        node.hasValidDates = false;
+        node.hasValidDates = !!(node.startDate || node.createdDate);
     }
 
     /**

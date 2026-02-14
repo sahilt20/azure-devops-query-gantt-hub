@@ -24,9 +24,19 @@ A Gantt Chart hub for Azure DevOps that visualizes work items from any saved que
 
 ### Smart Date Calculations
 - Uses all available date fields: Start Date, Target Date, Finish Date, Dev Completion Date, QA Completion Date
-- Inherits start dates from parent items when not set on the item itself
+- Resolves start dates using: Own Start Date -> Parent chain Start Date -> Work Item Created Date
 - Calculates end dates from planned hours using a 7-hour working day (skips weekends)
-- Items without a start date show "No start date" on their bar
+- Keeps bars anchored on timeline even when Start Date is missing on the current item
+
+### Resource Allocation (Task-Only)
+- Resource Allocation tab aggregates workload using Task items only
+- Parent rollup values are excluded to prevent double counting
+- Shows task count, planned effort, remaining effort, and progress by owner
+
+### Delivery Manager Analysis
+- Delivery Analysis tab provides query-level delivery health
+- Highlights overdue, blocked, unassigned, and no-estimate tasks
+- Includes owner load and recommended delivery actions
 
 ### Visual Indicators
 - Remaining work shown in red when it exceeds planned effort
@@ -66,16 +76,20 @@ A Gantt Chart hub for Azure DevOps that visualizes work items from any saved que
 
 | Level            | Start Date                                             | End Date                                              |
 | ---------------- | ------------------------------------------------------ | ----------------------------------------------------- |
-| **Task**         | Start Date or inherited from parent                    | Start + Planned Hours (7h/day) or Target/Finish Date  |
-| **Bug/PBI**      | Start Date or inherited from parent                    | Dev Completion, QA Completion, Target, or Finish Date |
-| **Feature/Epic** | Start Date or inherited from parent, or earliest child | Target Date, Finish Date, or latest child end date    |
+| **Task**         | Start Date, then parent chain Start Date, then Created Date                    | Start + Planned Hours (7h/day) or Target/Finish Date  |
+| **Bug/PBI**      | Start Date, then parent chain Start Date, then Created Date                    | Dev Completion, QA Completion, Target, or Finish Date |
+| **Feature/Epic** | Start Date, then parent chain Start Date, then Created Date, or earliest child | Target Date, Finish Date, or latest child end date    |
 
 ## How to Use
 
 1. Navigate to **Azure Boards** in your Azure DevOps project
 2. Click **Query Gantt Chart** in the hub navigation
 3. Select a saved query from the dropdown
-4. Use the toolbar to switch view modes, expand/collapse, export, or adjust settings
+4. Use tabs for:
+   - **Gantt Chart** timeline
+   - **Resource Allocation** (task-only)
+   - **Delivery Analysis** (delivery-manager perspective)
+5. Use the toolbar to switch view modes, expand/collapse, export, refresh, or adjust settings
 
 ## Toolbar Controls
 
@@ -87,6 +101,7 @@ A Gantt Chart hub for Azure DevOps that visualizes work items from any saved que
 | Export                    | Export to Excel or PNG screenshot                        |
 | Settings                  | Configure effort and remaining work fields, switch theme |
 | Refresh                   | Reload data from Azure DevOps                            |
+| Tabs                      | Switch between Gantt Chart, Resource Allocation, and Delivery Analysis |
 
 ## Supported Work Item Types
 
@@ -99,7 +114,7 @@ A Gantt Chart hub for Azure DevOps that visualizes work items from any saved que
 
 ## Extension Logic Flow
 
-The following diagram illustrates the core data flow and logic of the extension, from initialization to rendering the Gantt chart and Resource view.
+The following diagram illustrates the core data flow and logic of the extension, from initialization to rendering Gantt, Resource Allocation, and Delivery Analysis views.
 
 ```mermaid
 graph TD
@@ -129,6 +144,7 @@ graph TD
     subgraph UI Rendering
         GanttView["Gantt Chart View"]
         ResView["Resource Allocation View"]
+        AnalysisView["Delivery Analysis View"]
         Theme["Theme Service"]
     end
 
@@ -153,6 +169,7 @@ graph TD
     
     EffortCalc --> GanttView
     EffortCalc --> ResView
+    EffortCalc --> AnalysisView
     
     %% Detailed Logic - Dates
     subgraph Date Rules
@@ -176,6 +193,7 @@ graph TD
     %% Styling
     Theme -.-> GanttView
     Theme -.-> ResView
+    Theme -.-> AnalysisView
 ```
 
 ### Key Logic Explanations
@@ -186,10 +204,10 @@ graph TD
     *   Orphan items in tree queries are placed at the root level.
 
 2.  **Date Resolution**:
-    *   **Start Date**: Uses `Start Date` field. If missing, it inherits from the parent. If still missing, falls back to `Created Date`.
+    *   **Start Date**: Uses `Start Date` field. If missing, it walks up the parent chain. If still missing, falls back to `Created Date`.
     *   **End Date**: Uses `Target Date`, `Due Date`, or `Finish Date`.
     *   **Inference**: If dates are missing, the extension estimates duration based on `Original Estimate` (Planned Hours) or child item dates.
-    *   **Dotted Bars**: If an item has no planned effort and no explicit dates, it renders as a dotted bar to indicate uncertainty.
+    *   **Rendering**: Bars use resolved dates so missing direct Start Date does not force dotted display.
 
 3.  **Effort Rollup**:
     *   Values bubble up from **Task** level to **PBI**, **Feature**, and **Epic**.
@@ -197,5 +215,9 @@ graph TD
     *   `Done %` is calculated at each level based on the aggregated values: `100 - (Remaining / Effort * 100)`.
 
 4.  **Resource Allocation**:
-    *   The extension flattens the hierarchy and groups items by `Assigned To`.
+    *   The extension flattens the hierarchy, filters to `Task` items only, and groups by `Assigned To`.
     *   It aggregates Planned and Remaining effort per user to visualize workload.
+
+5.  **Delivery Analysis**:
+    *   The extension analyzes task delivery risk from a delivery manager perspective.
+    *   It flags overdue/blocked/unassigned/no-estimate tasks and shows owner load with recommended actions.

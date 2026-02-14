@@ -12,6 +12,7 @@ import { generateSampleWorkItems, sampleQueries } from '../../services/MockDataS
 import { themeService, Theme } from '../../services/ThemeService';
 import { GanttChart } from '../GanttChart/GanttChart';
 import { ResourceAllocation } from '../ResourceAllocation/ResourceAllocation';
+import { DeliveryAnalysis } from '../DeliveryAnalysis/DeliveryAnalysis';
 import { QuerySelector } from '../QuerySelector/QuerySelector';
 import './QueryGanttHub.css';
 
@@ -30,7 +31,7 @@ export const QueryGanttHub: React.FC = () => {
     const [projectName, setProjectName] = React.useState<string>('');
     const [useMockData, setUseMockData] = React.useState(isDevelopment);
     const [theme, setTheme] = React.useState<Theme>(themeService.getTheme());
-    const [activeTab, setActiveTab] = React.useState<'gantt' | 'allocation'>('gantt');
+    const [activeTab, setActiveTab] = React.useState<'gantt' | 'allocation' | 'analysis'>('gantt');
 
     // Initialize SDK and load queries
     React.useEffect(() => {
@@ -254,7 +255,7 @@ export const QueryGanttHub: React.FC = () => {
                         Query Gantt Chart
                     </h1>
                     <span className="hub-subtitle">
-                        Visualize work items from Epic → Feature → PBI → Task with effort rollup
+                        Plan delivery with timeline, task allocation, and delivery-manager analysis
                     </span>
                 </div>
                 <div className="hub-header-right">
@@ -300,36 +301,24 @@ export const QueryGanttHub: React.FC = () => {
             )}
 
             {/* Tabs */}
-            <div className="hub-tabs" style={{
-                padding: '0 20px',
-                marginBottom: '10px',
-                display: 'flex',
-                gap: '10px',
-                borderBottom: '1px solid var(--gantt-border)'
-            }}>
+            <div className="hub-tabs">
                 <button
-                    className={`gantt-btn ${activeTab === 'gantt' ? 'active' : ''}`}
+                    className={`hub-tab ${activeTab === 'gantt' ? 'active' : ''}`}
                     onClick={() => setActiveTab('gantt')}
-                    style={{
-                        background: activeTab === 'gantt' ? 'var(--gantt-row-hover)' : 'transparent',
-                        borderBottom: activeTab === 'gantt' ? '2px solid #4299e1' : 'none',
-                        borderRadius: '6px 6px 0 0',
-                        fontWeight: activeTab === 'gantt' ? 600 : 400
-                    }}
                 >
                     Gantt Chart
                 </button>
                 <button
-                    className={`gantt-btn ${activeTab === 'allocation' ? 'active' : ''}`}
+                    className={`hub-tab ${activeTab === 'allocation' ? 'active' : ''}`}
                     onClick={() => setActiveTab('allocation')}
-                    style={{
-                        background: activeTab === 'allocation' ? 'var(--gantt-row-hover)' : 'transparent',
-                        borderBottom: activeTab === 'allocation' ? '2px solid #4299e1' : 'none',
-                        borderRadius: '6px 6px 0 0',
-                        fontWeight: activeTab === 'allocation' ? 600 : 400
-                    }}
                 >
                     Resource Allocation
+                </button>
+                <button
+                    className={`hub-tab ${activeTab === 'analysis' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('analysis')}
+                >
+                    Delivery Analysis
                 </button>
             </div>
 
@@ -342,8 +331,10 @@ export const QueryGanttHub: React.FC = () => {
                         onWorkItemClick={handleWorkItemClick}
                         onRefresh={handleRefresh}
                     />
-                ) : (
+                ) : activeTab === 'allocation' ? (
                     <ResourceAllocation workItems={workItems} />
+                ) : (
+                    <DeliveryAnalysis workItems={workItems} />
                 )}
             </div>
         </div>

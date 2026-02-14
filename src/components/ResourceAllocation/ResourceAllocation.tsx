@@ -41,9 +41,8 @@ export const ResourceAllocation: React.FC<IResourceAllocationProps> = ({ workIte
 
         const allItems = flatten(workItems);
 
-        // Filter to only leaf nodes (Tasks)
-        // This avoids double counting parent rollup values and ensures we only track actionable work
-        const accountableItems = allItems.filter(item => item.workItemType === 'Task');
+        // Filter to Tasks only (exclude parent items to avoid rollup double counting)
+        const accountableItems = allItems.filter(item => isTaskWorkItem(item));
 
         for (const item of accountableItems) {
             const userName = item.assignedTo || 'Unassigned';
@@ -92,6 +91,9 @@ export const ResourceAllocation: React.FC<IResourceAllocationProps> = ({ workIte
 
     return (
         <div className="resource-allocation">
+            <div className="resource-header-note">
+                Task-only allocation view. Parent items are excluded from workload totals.
+            </div>
             <div className="resource-list-container">
                 <table className="resource-table">
                     <thead>
@@ -107,7 +109,7 @@ export const ResourceAllocation: React.FC<IResourceAllocationProps> = ({ workIte
                         {resourceStats.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="resource-empty">
-                                    No resource data available
+                                    No task-based resource data available
                                 </td>
                             </tr>
                         ) : (
@@ -160,6 +162,10 @@ export const ResourceAllocation: React.FC<IResourceAllocationProps> = ({ workIte
         </div>
     );
 };
+
+function isTaskWorkItem(item: IWorkItemNode): boolean {
+    return item.workItemType.trim().toLowerCase() === 'task';
+}
 
 // Helper: Get initials from name
 function getInitials(name: string): string {
