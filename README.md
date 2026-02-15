@@ -183,7 +183,12 @@ src/
 
 ## Version History
 
-### v1.3.8 (Latest)
+### v1.3.9 (Latest)
+- Redesigned Delivery Console filter pipeline so visible row data and filter counts always come from the same query-scoped dataset.
+- Added invariant diagnostics and active-filter row counters to detect and prevent count-vs-table drift.
+- Hardened risk-table rendering path to guarantee rows populate only for the selected query and selected filter.
+
+### v1.3.8
 - Enforced strict query-scoped rendering: no selected/loaded query now shows empty-state instead of stale Delivery data.
 - Added request race guards so old async query responses cannot overwrite current selection.
 - Added clear-selection option in Query Selector and aligned refresh behavior with selected query context.

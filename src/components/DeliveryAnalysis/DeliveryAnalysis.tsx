@@ -75,6 +75,8 @@ interface IFilterCounts {
     noEstimate: number;
 }
 
+type RowsByFilter = Record<RiskFilter, IRiskRow[]>;
+
 interface IAnalysis {
     totalTasks: number;
     openTasks: number;
@@ -239,20 +241,60 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
         return analysis.riskRows.filter(row => row.owner === ownerFilter);
     }, [analysis.riskRows, ownerFilter]);
 
-    const scopedFilterCounts = React.useMemo((): IFilterCounts => {
-        return {
-            all: ownerScopedRiskRows.length,
-            overdue: ownerScopedRiskRows.filter(r => r.reasons.includes('Overdue')).length,
-            overrun: ownerScopedRiskRows.filter(r => r.reasons.includes('Overrun')).length,
-            blocked: ownerScopedRiskRows.filter(r => r.reasons.includes('Blocked')).length,
-            unassigned: ownerScopedRiskRows.filter(r => r.reasons.includes('Unassigned')).length,
-            noEstimate: ownerScopedRiskRows.filter(r => r.reasons.includes('No Estimate')).length
+    const rowsByFilter = React.useMemo((): RowsByFilter => {
+        const byFilter: RowsByFilter = {
+            all: [],
+            overdue: [],
+            overrun: [],
+            blocked: [],
+            unassigned: [],
+            no_estimate: []
         };
+
+        for (const row of ownerScopedRiskRows) {
+            byFilter.all.push(row);
+            if (row.reasons.includes('Overdue')) byFilter.overdue.push(row);
+            if (row.reasons.includes('Overrun')) byFilter.overrun.push(row);
+            if (row.reasons.includes('Blocked')) byFilter.blocked.push(row);
+            if (row.reasons.includes('Unassigned')) byFilter.unassigned.push(row);
+            if (row.reasons.includes('No Estimate')) byFilter.no_estimate.push(row);
+        }
+
+        return byFilter;
     }, [ownerScopedRiskRows]);
 
-    const filteredRiskRows = React.useMemo(() => {
-        return ownerScopedRiskRows.filter(row => matchesRiskFilter(row, riskFilter));
-    }, [ownerScopedRiskRows, riskFilter]);
+    const scopedFilterCounts = React.useMemo((): IFilterCounts => {
+        return {
+            all: rowsByFilter.all.length,
+            overdue: rowsByFilter.overdue.length,
+            overrun: rowsByFilter.overrun.length,
+            blocked: rowsByFilter.blocked.length,
+            unassigned: rowsByFilter.unassigned.length,
+            noEstimate: rowsByFilter.no_estimate.length
+        };
+    }, [rowsByFilter]);
+
+    const filteredRiskRows = React.useMemo(() => rowsByFilter[riskFilter], [rowsByFilter, riskFilter]);
+    const activeFilterCount = React.useMemo(() => {
+        switch (riskFilter) {
+            case 'all': return scopedFilterCounts.all;
+            case 'overdue': return scopedFilterCounts.overdue;
+            case 'overrun': return scopedFilterCounts.overrun;
+            case 'blocked': return scopedFilterCounts.blocked;
+            case 'unassigned': return scopedFilterCounts.unassigned;
+            case 'no_estimate': return scopedFilterCounts.noEstimate;
+            default: return scopedFilterCounts.all;
+        }
+    }, [riskFilter, scopedFilterCounts]);
+
+    React.useEffect(() => {
+        if (filteredRiskRows.length !== activeFilterCount) {
+            console.warn(
+                '[DeliveryAnalysis] Filter mismatch detected',
+                { riskFilter, activeFilterCount, displayedRows: filteredRiskRows.length, ownerFilter }
+            );
+        }
+    }, [filteredRiskRows.length, activeFilterCount, riskFilter, ownerFilter]);
 
     const actions = React.useMemo(() => getRecommendedActions(analysis), [analysis]);
     const advancedMetrics = React.useMemo(() => buildAdvancedMetrics(analysis), [analysis]);
@@ -309,6 +351,9 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                 </div>
                 <div className="delivery-risk-legend">
                     Overdue: schedule date passed. Overrun: forecast effort exceeds estimate.
+                </div>
+                <div className="delivery-filter-count">
+                    Showing {filteredRiskRows.length} row(s) for filter: <strong>{riskFilter.replace('_', ' ')}</strong>
                 </div>
             </div>
 
