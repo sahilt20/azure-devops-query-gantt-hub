@@ -20,6 +20,7 @@ const WORK_ITEM_FIELDS = [
     'System.Title',
     'System.WorkItemType',
     'System.State',
+    'System.CreatedDate',
     'System.AssignedTo',
     'System.Parent',
     'System.IterationPath',

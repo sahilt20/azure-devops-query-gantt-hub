@@ -183,7 +183,12 @@ src/
 
 ## Version History
 
-### v1.3.10 (Latest)
+### v1.3.11 (Latest)
+- Fixed missing Gantt start-date fallback by requesting `System.CreatedDate` in work item batch fetch.
+- This restores the intended fallback chain: work item Start Date -> ancestor Start Date -> work item Created Date.
+- Prevents "No start date" dotted bars for items that only had Created Date available.
+
+### v1.3.10
 - Fixed Delivery Console UI overlap by removing stacked split-layout rendering and using a single consolidated console container.
 - Fixed at-risk table clipping/population issues by rendering rows inside a dedicated scrollable table wrapper.
 - Merged task-only Resource Allocation directly into Delivery Console (Owner panel) with aligned progress and risk visibility.
