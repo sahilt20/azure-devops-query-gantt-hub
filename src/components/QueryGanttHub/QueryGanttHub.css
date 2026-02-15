@@ -347,6 +347,20 @@
     overflow: hidden;
 }
 
+.hub-delivery-empty {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gantt-text-muted);
+    border: 1px dashed var(--gantt-border);
+    border-radius: 12px;
+    background: var(--gantt-bg);
+    padding: 24px;
+    text-align: center;
+    font-size: 14px;
+}
+
 /* Loading Overlay */
 .hub-loading {
     position: absolute;

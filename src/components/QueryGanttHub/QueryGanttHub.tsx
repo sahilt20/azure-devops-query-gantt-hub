@@ -23,6 +23,7 @@ const isDevelopment = typeof window !== 'undefined' &&
 export const QueryGanttHub: React.FC = () => {
     const [queries, setQueries] = React.useState<IQueryInfo[]>([]);
     const [selectedQueryId, setSelectedQueryId] = React.useState<string>('');
+    const [loadedQueryId, setLoadedQueryId] = React.useState<string>('');
     const [workItems, setWorkItems] = React.useState<IWorkItemNode[]>([]);
     const [isLoading, setIsLoading] = React.useState(false);
     const [isLoadingQueries, setIsLoadingQueries] = React.useState(true);
@@ -32,6 +33,7 @@ export const QueryGanttHub: React.FC = () => {
     const [useMockData, setUseMockData] = React.useState(isDevelopment);
     const [theme, setTheme] = React.useState<Theme>(themeService.getTheme());
     const [activeTab, setActiveTab] = React.useState<'gantt' | 'delivery'>('gantt');
+    const queryRequestRef = React.useRef(0);
 
     // Initialize SDK and load queries
     React.useEffect(() => {
@@ -81,16 +83,21 @@ export const QueryGanttHub: React.FC = () => {
     const executeQuery = React.useCallback(async (queryId: string) => {
         if (!queryId) return;
 
+        const requestId = ++queryRequestRef.current;
         setIsLoading(true);
         setError(null);
+        setLoadedQueryId('');
+        setWorkItems([]);
 
         try {
             if (useMockData) {
                 // Simulate loading delay
                 await new Promise(resolve => setTimeout(resolve, 500));
+                if (requestId !== queryRequestRef.current) return;
                 const mockData = generateSampleWorkItems();
                 effortRollupService.calculateRollup(mockData);
                 setWorkItems(mockData);
+                setLoadedQueryId(queryId);
                 setDebugInfo(`Loaded ${mockData.length} sample work items`);
                 return;
             }
@@ -119,11 +126,13 @@ export const QueryGanttHub: React.FC = () => {
             } else {
                 setDebugInfo('Query returned no results');
                 setWorkItems([]);
+                setLoadedQueryId(queryId);
                 return;
             }
 
             if (workItemIds.length === 0) {
                 setWorkItems([]);
+                setLoadedQueryId(queryId);
                 return;
             }
 
@@ -150,28 +159,41 @@ export const QueryGanttHub: React.FC = () => {
             // Calculate effort rollup
             effortRollupService.calculateRollup(hierarchy);
 
+            if (requestId !== queryRequestRef.current) return;
             setWorkItems(hierarchy);
+            setLoadedQueryId(queryId);
             setDebugInfo(`Displaying ${hierarchy.length} root items with ${rawWorkItems.length} total work items`);
         } catch (err) {
+            if (requestId !== queryRequestRef.current) return;
             console.error('Failed to execute query:', err);
             const errorMessage = err instanceof Error ? err.message : String(err);
             setError(`Failed to execute query: ${errorMessage}`);
             setDebugInfo(`Query error: ${errorMessage}`);
+            setLoadedQueryId('');
         } finally {
-            setIsLoading(false);
+            if (requestId === queryRequestRef.current) {
+                setIsLoading(false);
+            }
         }
     }, [useMockData]);
 
-    // Handle query selection
-    const handleQueryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const queryId = e.target.value;
+    // Handle query selection from custom selector
+    const handleQuerySelect = React.useCallback((queryId: string) => {
         setSelectedQueryId(queryId);
+        setError(null);
+
         if (queryId) {
             executeQuery(queryId);
-        } else {
-            setWorkItems([]);
+            return;
         }
-    };
+
+        // Clear selection: reset delivery/gantt data explicitly
+        queryRequestRef.current += 1;
+        setIsLoading(false);
+        setLoadedQueryId('');
+        setWorkItems([]);
+        setDebugInfo('Select a query to load data.');
+    }, [executeQuery]);
 
     // Handle work item click - open in Azure DevOps
     const handleWorkItemClick = React.useCallback((workItem: IWorkItemNode) => {
@@ -183,67 +205,23 @@ export const QueryGanttHub: React.FC = () => {
         window.open(url, '_blank');
     }, [projectName, useMockData]);
 
-    // Load all hierarchical items or sample data
-    const loadAllHierarchical = React.useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        setSelectedQueryId('');
-
-        try {
-            if (useMockData) {
-                // Simulate loading delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-                const mockData = generateSampleWorkItems();
-                effortRollupService.calculateRollup(mockData);
-                setWorkItems(mockData);
-                setDebugInfo(`Loaded ${mockData.length} sample work items`);
-                return;
-            }
-
-            setDebugInfo('Loading all work items...');
-            const rawWorkItems = await azureDevOpsService.getHierarchicalWorkItems();
-            setDebugInfo(`Found ${rawWorkItems.length} work items, building hierarchy...`);
-
-            const hierarchy = workItemHierarchyService.buildHierarchy(rawWorkItems);
-            effortRollupService.calculateRollup(hierarchy);
-            setWorkItems(hierarchy);
-            setDebugInfo(`Displaying ${hierarchy.length} root items with ${rawWorkItems.length} total work items`);
-        } catch (err) {
-            console.error('Failed to load hierarchical items:', err);
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            setError(`Failed to load: ${errorMessage}`);
-            setDebugInfo(`Error: ${errorMessage}`);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [useMockData]);
-
-    // Toggle mock data mode
-    const toggleMockData = () => {
-        setUseMockData(!useMockData);
-        setWorkItems([]);
-        setSelectedQueryId('');
-        setError(null);
-        setDebugInfo('');
-    };
-
     // Refresh data
     const handleRefresh = React.useCallback(() => {
         if (selectedQueryId) {
             executeQuery(selectedQueryId);
         } else {
-            // If no query selected, assume "Load All" or just refresh whatever is there if we have items
-            if (workItems.length > 0) {
-                loadAllHierarchical();
-            }
+            setDebugInfo('Select a query before refreshing.');
         }
-    }, [selectedQueryId, executeQuery, loadAllHierarchical, workItems.length]);
+    }, [selectedQueryId, executeQuery]);
 
     // Theme toggle
     const handleThemeToggle = React.useCallback(() => {
         const newTheme = themeService.toggleTheme();
         setTheme(newTheme);
     }, []);
+
+    const hasSelectedQuery = selectedQueryId.trim().length > 0;
+    const hasLoadedSelectedQuery = hasSelectedQuery && loadedQueryId === selectedQueryId;
 
     return (
         <div className={`query-gantt-hub ${theme === 'light' ? 'theme-light' : ''}`}>
@@ -273,10 +251,7 @@ export const QueryGanttHub: React.FC = () => {
                         <QuerySelector
                             queries={queries}
                             selectedQueryId={selectedQueryId}
-                            onQuerySelect={(id) => {
-                                setSelectedQueryId(id);
-                                if (id) executeQuery(id);
-                            }}
+                            onQuerySelect={handleQuerySelect}
                             disabled={isLoading}
                             isLoading={isLoadingQueries}
                         />
@@ -320,20 +295,26 @@ export const QueryGanttHub: React.FC = () => {
             <div className="hub-content">
                 {activeTab === 'gantt' ? (
                     <GanttChart
-                        workItems={workItems}
+                        workItems={hasLoadedSelectedQuery ? workItems : []}
                         isLoading={isLoading || isLoadingQueries}
                         onWorkItemClick={handleWorkItemClick}
                         onRefresh={handleRefresh}
                     />
                 ) : (
-                    <div className="hub-delivery-console">
-                        <div className="hub-delivery-analysis">
-                            <DeliveryAnalysis workItems={workItems} />
+                    hasLoadedSelectedQuery ? (
+                        <div className="hub-delivery-console">
+                            <div className="hub-delivery-analysis">
+                                <DeliveryAnalysis workItems={workItems} />
+                            </div>
+                            <div className="hub-delivery-allocation">
+                                <ResourceAllocation workItems={workItems} />
+                            </div>
                         </div>
-                        <div className="hub-delivery-allocation">
-                            <ResourceAllocation workItems={workItems} />
+                    ) : (
+                        <div className="hub-delivery-empty">
+                            Select a query to view Delivery Console analytics and allocation.
                         </div>
-                    </div>
+                    )
                 )}
             </div>
         </div>

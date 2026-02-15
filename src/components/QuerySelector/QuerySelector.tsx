@@ -137,6 +137,14 @@ export const QuerySelector: React.FC<IQuerySelectorProps> = ({
                             <div className="query-selector-loading">Loading queries...</div>
                         ) : (
                             <>
+                                {/* Clear Selection */}
+                                <div
+                                    className={`query-selector-item query-selector-clear ${selectedQueryId === '' ? 'selected' : ''}`}
+                                    onClick={() => handleSelect('')}
+                                >
+                                    <span className="query-item-name">⨯ Clear selection</span>
+                                </div>
+
                                 {/* Query Folders */}
                                 {folderGroups.map(([folder, groupQueries]) => (
                                     <div key={folder} className="query-selector-section">

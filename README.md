@@ -183,7 +183,12 @@ src/
 
 ## Version History
 
-### v1.3.7 (Latest)
+### v1.3.8 (Latest)
+- Enforced strict query-scoped rendering: no selected/loaded query now shows empty-state instead of stale Delivery data.
+- Added request race guards so old async query responses cannot overwrite current selection.
+- Added clear-selection option in Query Selector and aligned refresh behavior with selected query context.
+
+### v1.3.7
 - Fixed Delivery Console filter/table mismatch where counts showed but rows did not populate.
 - Aligned risk chip counts with owner-scoped table results and auto-reset invalid owner selections.
 

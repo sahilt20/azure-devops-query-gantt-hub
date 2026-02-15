@@ -143,6 +143,11 @@
     border-left: 3px solid #4a9eff;
 }
 
+.query-selector-item.query-selector-clear {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-style: italic;
+}
+
 .query-item-name {
     flex: 1;
     overflow: hidden;
@@ -246,6 +251,10 @@
 .theme-light .query-selector-enhanced .query-selector-item.selected {
     background: rgba(74, 158, 255, 0.1);
     border-left-color: #4a9eff;
+}
+
+.theme-light .query-selector-enhanced .query-selector-item.query-selector-clear {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 
 .theme-light .query-selector-enhanced .query-item-name {
