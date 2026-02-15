@@ -249,7 +249,44 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                     <h4>Operational Tabs</h4>
                                     <ul>
                                         <li><strong>Resource Allocation:</strong> Task-only workload view (parent items excluded)</li>
-                                        <li><strong>Delivery Analysis:</strong> Delivery-manager view with risk, ownership, and action insights</li>
+                                        <li><strong>Delivery Console:</strong> Combined delivery-manager view with analytics, risk filters, and task-only allocation</li>
+                                    </ul>
+
+                                    <h4>Delivery Console Metrics</h4>
+                                    <p>
+                                        Delivery Console is task-based. All measures below are calculated from open tasks in the selected query.
+                                    </p>
+
+                                    <h5>Core Health Metrics</h5>
+                                    <ul>
+                                        <li><strong>Completion (Gantt):</strong> Same weighted overall percent used in Gantt toolbar (from rollup totals)</li>
+                                        <li><strong>Delivery Health (0-100):</strong> 100 minus weighted penalties for Overdue, Overrun, Blocked, Unassigned, and No Estimate tasks</li>
+                                        <li><strong>Delivery Confidence (0-100):</strong> Weighted composite of Completion, Delivery Health, Estimate Coverage, Assignment Coverage, and Load Balance</li>
+                                    </ul>
+
+                                    <h5>Coverage & Pressure Metrics</h5>
+                                    <ul>
+                                        <li><strong>Estimate Coverage %:</strong> (Open tasks with estimate &gt; 0 / Total open tasks) × 100</li>
+                                        <li><strong>Assignment Coverage %:</strong> (Open tasks with assigned owner / Total open tasks) × 100</li>
+                                        <li><strong>Schedule Pressure %:</strong> (Open tasks due within next 7 days / Total open tasks) × 100</li>
+                                        <li><strong>Risk Density %:</strong> (At-risk open tasks / Total open tasks) × 100</li>
+                                    </ul>
+
+                                    <h5>Effort Risk Metrics</h5>
+                                    <ul>
+                                        <li><strong>Exposure Hours:</strong> Sum of remaining hours for tasks due within 7 days</li>
+                                        <li><strong>Overrun Hours:</strong> Sum of max(Remaining - Estimated, 0) for overrun tasks</li>
+                                        <li><strong>Load Balance %:</strong> 100 - normalized workload variation across owners (higher is better balanced)</li>
+                                    </ul>
+
+                                    <h5>Risk Classification Logic</h5>
+                                    <ul>
+                                        <li><strong>Overdue:</strong> End/Due date is earlier than today (schedule risk)</li>
+                                        <li><strong>Overrun:</strong> Remaining hours exceed estimated/planned hours (effort risk)</li>
+                                        <li><strong>Blocked:</strong> State includes blocked/impediment/on hold</li>
+                                        <li><strong>No Estimate:</strong> Estimated/planned effort is 0</li>
+                                        <li><strong>Unassigned:</strong> Assigned To is empty or Unassigned</li>
+                                        <li><strong>Risk Score (0-100):</strong> Aggregated per-task score from risk flags, due urgency, and remaining effort</li>
                                     </ul>
 
                                     <h4>Timeline Scaling</h4>
@@ -354,6 +391,35 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                         <dd>
                                             Indicates whether a work item has real dates (explicit or inherited)
                                             or is using default estimated dates. Items without valid dates show a dashed border.
+                                        </dd>
+
+                                        <dt>Overdue vs Overrun</dt>
+                                        <dd>
+                                            Overdue means date slippage (due date already passed). Overrun means effort slippage
+                                            (remaining hours are greater than estimated hours).
+                                        </dd>
+
+                                        <dt>Delivery Health</dt>
+                                        <dd>
+                                            A 0-100 risk score where higher is better. It decreases based on the proportion of
+                                            overdue, overrun, blocked, unassigned, and no-estimate open tasks.
+                                        </dd>
+
+                                        <dt>Delivery Confidence</dt>
+                                        <dd>
+                                            A 0-100 composite indicator that combines completion progress, health score,
+                                            estimate/assignment coverage, and workload balance.
+                                        </dd>
+
+                                        <dt>Exposure Hours</dt>
+                                        <dd>
+                                            Total remaining hours for tasks due in the next 7 days.
+                                        </dd>
+
+                                        <dt>Load Balance</dt>
+                                        <dd>
+                                            A 0-100 measure of how evenly remaining workload is distributed across owners.
+                                            Higher values indicate better distribution.
                                         </dd>
                                     </dl>
                                 </div>

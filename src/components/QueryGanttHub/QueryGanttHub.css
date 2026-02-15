@@ -333,6 +333,20 @@
     overflow: hidden;
 }
 
+.hub-delivery-console {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(260px, 38%);
+    gap: 12px;
+    height: 100%;
+    min-height: 0;
+}
+
+.hub-delivery-analysis,
+.hub-delivery-allocation {
+    min-height: 0;
+    overflow: hidden;
+}
+
 /* Loading Overlay */
 .hub-loading {
     position: absolute;
@@ -392,6 +406,10 @@
 
     .hub-tab {
         white-space: nowrap;
+    }
+
+    .hub-delivery-console {
+        grid-template-rows: minmax(0, 1fr) minmax(260px, 45%);
     }
 }
 

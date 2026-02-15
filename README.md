@@ -1,222 +1,217 @@
 # Azure DevOps Query Gantt Chart Extension
 
-A custom Azure DevOps extension that adds a **Gantt Chart** hub to visualize work items from **Epic → Feature → PBI → Task** with automatic effort rollup and percent complete calculations.
+A custom Azure DevOps extension that adds a Gantt hub and a Delivery Console for planning and tracking delivery from saved queries.
+
+## Product Overview
+
+The extension provides two working views:
+
+1. `Gantt Chart`: timeline view with hierarchy, rollups, and configurable date/effort logic.
+2. `Delivery Console`: combined delivery analytics and task-only resource allocation in one tab.
+
+Work item hierarchy supported by default:
+
+```text
+Epic (Level 0)
+└── Feature (Level 1)
+    └── Product Backlog Item / Bug (Level 2)
+        └── Task (Level 3)
+```
 
 ## Screenshots
 
-### Query Selector with Folder Grouping
+### Query Selector
 ![Query Selector](images/query-selector.png)
 
-### Gantt Chart - Day View
+### Gantt Day View
 ![Day View](images/gantt-day-view.png)
 
-### Gantt Chart - Month View
+### Gantt Month View
 ![Month View](images/gantt-month-view.png)
 
 ### Field Configuration
 ![Field Config](images/field-config.png)
 
-## Features
+## Core Features
 
-- 📊 **Gantt Chart Visualization** - View work items on a timeline with progress bars
-- 🔄 **Effort Rollup** - Automatically calculates effort from Task level up
-- 📈 **Auto-Calculated Done %** - Automatically computed from Effort and Remaining Work
-- 🌳 **Hierarchical View** - Collapsible tree structure (Epic → Feature → PBI → Task)
-- 🔍 **Enhanced Query Selector** - Search queries with folder grouping (My Queries/Shared Queries)
-- 🎨 **Modern UI** - Dark theme with smooth animations and glassmorphism effects
-- 📅 **Multiple View Modes** - Day, Week, and Month timeline views with dynamic scaling
-- ⚙️ **Configurable Fields** - Choose which fields to use for effort calculations
-- 🧭 **Delivery Analysis Tab** - Delivery-manager insights for risk, owner load, and next actions
-- 👥 **Task-Only Resource Allocation** - Allocation totals are calculated from Task items only (no parent rollup double-counting)
+### Gantt Chart
+- Timeline bars for Epic, Feature, PBI, Bug, Task, and custom types.
+- Day/Week/Month modes.
+- Expand/collapse hierarchy.
+- Today marker and date-range controls.
+- Click rows/bars to open work items in Azure DevOps.
 
-## Work Item Hierarchy
+### Effort Rollup
+- Task-level effort and remaining values roll up to parent levels.
+- Done % calculation:
+  - `Done % = 100 - (Remaining / Effort × 100)`
+- Weighted percent logic is used for parent and overall percentages.
 
-```
-Epic (Level 0)
-└── Feature (Level 1)
-    └── Product Backlog Item (Level 2)
-        └── Task (Level 3)
-```
+### Start Date Resolution
+Start is resolved in this order:
+1. Item `Start Date`
+2. Parent chain `Start Date` (recursive)
+3. Item `Created Date`
 
-## Effort Rollup Logic
+This keeps bars anchored even when direct start dates are missing.
 
-- **Tasks**: Use configurable fields (default: `Original Estimate`, `Remaining Work`)
-- **Parent Items**: Sum of all descendant effort values
-- **Done %**: Automatically calculated as `100 - (Remaining Work / Effort × 100)`
+### Delivery Console (Merged View)
+Delivery Console combines:
+1. Delivery Analysis
+2. Task-only Resource Allocation
 
-## Start Date Resolution Logic
+Resource allocation intentionally excludes parent rollup rows to avoid double-counting.
 
-- **Primary**: Work item's own `Start Date`
-- **Fallback 1**: Closest parent `Start Date` (walks up parent chain)
-- **Fallback 2**: Work item's `Created Date` if no ancestor has start date
-- This ensures timeline bars remain anchored even when Start Date is missing on the current item
+## Delivery Analytics Measures
 
-## Installation
+All metrics are computed from open task items in the selected query.
+
+### Core Scores
+- `Completion (Gantt)`: same weighted overall percent shown in Gantt toolbar.
+- `Delivery Health (0-100)`: penalty model over overdue/overrun/blocked/unassigned/no-estimate task ratios.
+- `Delivery Confidence (0-100)`: weighted composite of completion, health, estimate coverage, assignment coverage, and load balance.
+
+### Coverage and Pressure
+- `Estimate Coverage % = tasks with estimate > 0 / open tasks × 100`
+- `Assignment Coverage % = assigned open tasks / open tasks × 100`
+- `Schedule Pressure % = open tasks due in next 7 days / open tasks × 100`
+- `Risk Density % = at-risk open tasks / open tasks × 100`
+
+### Effort Risk
+- `Exposure Hours`: sum of remaining hours on tasks due in next 7 days.
+- `Overrun Hours`: sum of `max(Remaining - Estimated, 0)` across overrun tasks.
+- `Load Balance %`: normalized owner workload distribution score (higher means better balance).
+
+### Risk Classification
+- `Overdue`: end/due date is before today (schedule risk).
+- `Overrun`: remaining effort is greater than estimated effort (effort risk).
+- `Blocked`: state indicates blocked/impediment/on-hold.
+- `No Estimate`: estimate is zero.
+- `Unassigned`: no owner.
+- `Risk Score (0-100)`: per-task risk ranking from flags, urgency, and remaining effort.
+
+### Delivery Operations
+- Risk filters (`All`, `Overdue`, `Overrun`, `Blocked`, `Unassigned`, `No Estimate`).
+- Owner filter.
+- At-risk list with clickable work item links.
+- Owner risk matrix.
+- Top bottlenecks.
+- Due-next-7-days watchlist.
+- Recommended actions.
+
+## Query Integration
+- Supports Flat, Tree, and One-Hop query results.
+- Query selector with folder grouping and search.
+- Works with saved queries in current Azure DevOps project context.
+
+## Export
+- Export to Excel.
+- Export Gantt screenshot (PNG).
+
+## Configuration
+
+### Field Configuration
+In Gantt Settings (`⚙`), configure:
+- Effort field
+- Remaining work field
+- Delivery and date logic reference documentation
+
+### Required Scopes
+- `vso.work` (read work items and queries)
+
+## Installation and Build
 
 ### Prerequisites
-
-- Node.js 18+ 
+- Node.js 18+
 - npm 9+
 - Azure DevOps organization
 - TFX CLI (`npm install -g tfx-cli`)
 
-### Build & Package
+### Build
 
 ```bash
-# Install dependencies
 npm install
-
-# Build the extension
 npm run build
+```
 
-# Package for distribution
+### Package VSIX
+
+```bash
 npm run package
 ```
 
-This creates a `.vsix` file that can be uploaded to the Azure DevOps Marketplace.
-
-### Local Development
-
-```bash
-# Start development server
-npm run start:dev
-```
-
-The dev server runs at `https://localhost:3001`.
-
-## Configuration
-
-### Update Publisher ID
-
-Edit `vss-extension.json` and replace `your-publisher-id` with your Azure DevOps Marketplace publisher ID:
-
-```json
-{
-    "publisher": "your-actual-publisher-id"
-}
-```
-
-### Field Configuration
-
-Click the ⚙️ button in the Gantt chart toolbar to configure:
-- **Effort Field** - Field used for planned/estimated work
-- **Remaining Work Field** - Field used for remaining hours
-- **Done %** - Automatically calculated from Effort and Remaining fields
-
-### Required Scopes
-
-The extension requires the following Azure DevOps scopes:
-- `vso.work` - Read work items and queries
-
 ## Usage
 
-1. Navigate to **Azure Boards** in your Azure DevOps project
-2. Click on **Query Gantt Chart** in the hub navigation
-3. Select a query from the enhanced dropdown (supports search and folder grouping)
-4. The Gantt chart displays with:
-   - Work item hierarchy on the left
-   - Timeline with progress bars on the right
-   - Effort rollup and percent complete for each item
-5. Switch between tabs:
-   - **Gantt Chart** for timeline view
-   - **Resource Allocation** for task-only workload by owner
-   - **Delivery Analysis** for delivery-manager risk and action insights
+1. Open Azure Boards in your project.
+2. Open `Query Gantt Chart` hub.
+3. Select a query.
+4. Use tabs:
+   - `Gantt Chart`
+   - `Delivery Console` (analysis + resource allocation)
+5. Use toolbar controls for date/view/export/settings.
 
-### Toolbar Controls
+## Toolbar Controls
 
-| Control            | Description                   |
-| ------------------ | ----------------------------- |
-| **Day/Week/Month** | Switch timeline view modes    |
-| **⚙️ Settings**     | Configure effort fields       |
-| **🔄 Refresh**      | Reload data from Azure DevOps |
-| **Expand All**     | Expand entire hierarchy       |
-| **Collapse All**   | Collapse to top level         |
-| **Tabs**           | Gantt Chart, Resource Allocation, Delivery Analysis |
+| Control | Description |
+| --- | --- |
+| Day / Week / Month | Timeline mode |
+| Expand All / Collapse All | Hierarchy visibility |
+| Date Range Picker | Visible timeline window |
+| Export | Excel / PNG export |
+| Settings | Field mapping and logic docs |
+| Refresh | Reload query data |
 
 ## Project Structure
 
-```
-azure-devops-query-ui-hub/
-├── src/
-│   ├── components/
-│   │   ├── GanttChart/
-│   │   │   ├── GanttChart.tsx     # Main Gantt component
-│   │   │   ├── GanttRow.tsx       # Work item row
-│   │   │   ├── GanttBar.tsx       # Progress bar
-│   │   │   ├── GanttTimeline.tsx  # Timeline header
-│   │   │   └── GanttChart.css     # Styles
-│   │   ├── QuerySelector/
-│   │   │   ├── QuerySelector.tsx  # Enhanced query dropdown
-│   │   │   └── QuerySelector.css  # Dropdown styles
-│   │   ├── FieldConfig/
-│   │   │   ├── FieldConfigModal.tsx  # Field settings modal
-│   │   │   └── FieldConfigModal.css  # Modal styles
-│   │   ├── ResourceAllocation/
-│   │   │   ├── ResourceAllocation.tsx # Task-only allocation view
-│   │   │   └── ResourceAllocation.css # Allocation styles
-│   │   ├── DeliveryAnalysis/
-│   │   │   ├── DeliveryAnalysis.tsx # Delivery-manager analysis tab
-│   │   │   └── DeliveryAnalysis.css # Analysis styles
-│   │   └── QueryGanttHub/
-│   │       ├── QueryGanttHub.tsx  # Main hub component
-│   │       └── QueryGanttHub.css  # Hub styles
-│   ├── services/
-│   │   ├── AzureDevOpsService.ts     # API integration
-│   │   ├── WorkItemHierarchyService.ts # Hierarchy building
-│   │   ├── EffortRollupService.ts    # Effort calculations
-│   │   ├── FieldConfigService.ts     # Field configuration
-│   │   └── MockDataService.ts        # Sample data for testing
-│   ├── models/
-│   │   └── WorkItemModels.ts      # TypeScript interfaces
-│   ├── utils/
-│   │   └── DateUtils.ts           # Date helpers
-│   ├── QueryGanttHub.tsx          # Entry point
-│   └── QueryGanttHub.html         # HTML template
-├── images/                        # README screenshots
-├── static/
-│   └── images/
-│       └── gantt-icon.png         # Extension icon
-├── vss-extension.json             # Extension manifest
-├── package.json
-├── tsconfig.json
-└── webpack.config.js
+```text
+src/
+  components/
+    GanttChart/
+    QuerySelector/
+    FieldConfig/
+    ResourceAllocation/
+    DeliveryAnalysis/
+    QueryGanttHub/
+  services/
+    AzureDevOpsService.ts
+    WorkItemHierarchyService.ts
+    EffortRollupService.ts
+    FieldConfigService.ts
+  models/
+  utils/
 ```
 
 ## Version History
 
-### v1.2.1 (Latest)
-- ✅ Auto-calculated Done % from Effort and Remaining fields
-- ✅ Timeline properly scales when switching Day/Week/Month views
-- ✅ Enhanced query selector with solid background and folder grouping
-- ✅ Removed sample data toggle button
-- ✅ Improved toolbar spacing
+### v1.3.6 (Latest)
+- Reworked Delivery Console data pipeline so all filters and counters use one consistent task-facts model.
+- Fixed Overrun calculations using forecast effort (`Completed + Remaining`) and added explicit overrun hours.
+- Improved Delivery Console views: richer at-risk table, owner risk matrix consistency, and clearer risk breakdown.
 
-### v1.2.0
-- Added configurable field mappings
-- Enhanced query selector with search and favorites
-- Fixed week/month timeline views
+### v1.3.5
+- Merged Delivery Analysis and Resource Allocation into one Delivery Console tab.
+- Added advanced delivery analytics: confidence, risk density, pressure, exposure, overrun hours, load balance, owner risk matrix, bottleneck ranking.
+- Added Overrun filter and clarified Overdue vs Overrun logic.
+- Expanded Settings documentation with metric formulas and definitions.
+- Consolidated documentation so README is the primary full reference.
 
-### v1.1.x
-- Query integration improvements
-- UI enhancements
-- Bug fixes
+### v1.3.4
+- Added deeper delivery analytics and action-center improvements.
+- Updated extension package to 1.3.4.
 
-## Troubleshooting & Known Issues
+### v1.3.3
+- Added clickable work item links in Delivery Analysis.
+- Aligned completion % with Gantt overall percent calculation.
 
-### "Content Security Policy" blocks 'eval'
-If you see an error about `unsafe-eval` in the console:
-- This is caused by webpack source maps.
-- **Fix**: Build with `devtool: false` (already configured in v1.0.6+).
+## Troubleshooting
 
-### Authentication Hanging
-If the extension hangs on "Loading...":
-- Check the console for `[AzureDevOpsService]` logs.
-- Ensure your network allows access to `dev.azure.com`.
-- The extension now uses native `fetch()` calls to bypass potential SDK client library issues.
+### No project context
+Ensure the hub is opened inside a project URL like:
+`https://dev.azure.com/{org}/{project}/_apps/hub/...`
 
-### "No project context" Error
-- Ensure you are viewing the hub within an active Azure DevOps project.
-- The extension URL should look like: `https://dev.azure.com/{org}/{project}/_apps/hub/...`
+### Slow or failed data load
+- Check browser console for service logs.
+- Confirm access to `dev.azure.com`.
 
 ## License
 

@@ -31,7 +31,7 @@ export const QueryGanttHub: React.FC = () => {
     const [projectName, setProjectName] = React.useState<string>('');
     const [useMockData, setUseMockData] = React.useState(isDevelopment);
     const [theme, setTheme] = React.useState<Theme>(themeService.getTheme());
-    const [activeTab, setActiveTab] = React.useState<'gantt' | 'allocation' | 'analysis'>('gantt');
+    const [activeTab, setActiveTab] = React.useState<'gantt' | 'delivery'>('gantt');
 
     // Initialize SDK and load queries
     React.useEffect(() => {
@@ -309,16 +309,10 @@ export const QueryGanttHub: React.FC = () => {
                     Gantt Chart
                 </button>
                 <button
-                    className={`hub-tab ${activeTab === 'allocation' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('allocation')}
+                    className={`hub-tab ${activeTab === 'delivery' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('delivery')}
                 >
-                    Resource Allocation
-                </button>
-                <button
-                    className={`hub-tab ${activeTab === 'analysis' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('analysis')}
-                >
-                    Delivery Analysis
+                    Delivery Console
                 </button>
             </div>
 
@@ -331,10 +325,15 @@ export const QueryGanttHub: React.FC = () => {
                         onWorkItemClick={handleWorkItemClick}
                         onRefresh={handleRefresh}
                     />
-                ) : activeTab === 'allocation' ? (
-                    <ResourceAllocation workItems={workItems} />
                 ) : (
-                    <DeliveryAnalysis workItems={workItems} />
+                    <div className="hub-delivery-console">
+                        <div className="hub-delivery-analysis">
+                            <DeliveryAnalysis workItems={workItems} />
+                        </div>
+                        <div className="hub-delivery-allocation">
+                            <ResourceAllocation workItems={workItems} />
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
