@@ -183,7 +183,12 @@ src/
 
 ## Version History
 
-### v1.3.9 (Latest)
+### v1.3.10 (Latest)
+- Fixed Delivery Console UI overlap by removing stacked split-layout rendering and using a single consolidated console container.
+- Fixed at-risk table clipping/population issues by rendering rows inside a dedicated scrollable table wrapper.
+- Merged task-only Resource Allocation directly into Delivery Console (Owner panel) with aligned progress and risk visibility.
+
+### v1.3.9
 - Redesigned Delivery Console filter pipeline so visible row data and filter counts always come from the same query-scoped dataset.
 - Added invariant diagnostics and active-filter row counters to detect and prevent count-vs-table drift.
 - Hardened risk-table rendering path to guarantee rows populate only for the selected query and selected filter.

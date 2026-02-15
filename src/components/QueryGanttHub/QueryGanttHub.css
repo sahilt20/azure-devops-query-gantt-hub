@@ -334,15 +334,14 @@
 }
 
 .hub-delivery-console {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) minmax(260px, 38%);
-    gap: 12px;
+    display: block;
     height: 100%;
     min-height: 0;
+    overflow: hidden;
 }
 
-.hub-delivery-analysis,
-.hub-delivery-allocation {
+.hub-delivery-analysis {
+    height: 100%;
     min-height: 0;
     overflow: hidden;
 }
@@ -423,7 +422,7 @@
     }
 
     .hub-delivery-console {
-        grid-template-rows: minmax(0, 1fr) minmax(260px, 45%);
+        display: block;
     }
 }
 

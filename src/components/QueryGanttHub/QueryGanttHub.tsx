@@ -11,7 +11,6 @@ import { effortRollupService } from '../../services/EffortRollupService';
 import { generateSampleWorkItems, sampleQueries } from '../../services/MockDataService';
 import { themeService, Theme } from '../../services/ThemeService';
 import { GanttChart } from '../GanttChart/GanttChart';
-import { ResourceAllocation } from '../ResourceAllocation/ResourceAllocation';
 import { DeliveryAnalysis } from '../DeliveryAnalysis/DeliveryAnalysis';
 import { QuerySelector } from '../QuerySelector/QuerySelector';
 import './QueryGanttHub.css';
@@ -305,9 +304,6 @@ export const QueryGanttHub: React.FC = () => {
                         <div className="hub-delivery-console">
                             <div className="hub-delivery-analysis">
                                 <DeliveryAnalysis workItems={workItems} />
-                            </div>
-                            <div className="hub-delivery-allocation">
-                                <ResourceAllocation workItems={workItems} />
                             </div>
                         </div>
                     ) : (

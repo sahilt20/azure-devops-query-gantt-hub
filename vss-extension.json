@@ -1,7 +1,7 @@
 {
     "manifestVersion": 1,
     "id": "query-gantt-hub-beta",
-    "version": "1.3.9",
+    "version": "1.3.10",
     "name": "Query Gantt Chart (Beta)",
     "description": "Azure DevOps Query Gantt with timeline planning and a Delivery Console for risk analytics, task-only allocation, effort rollup, weighted completion, date fallback, and export.",
     "publisher": "SahilTanwar",

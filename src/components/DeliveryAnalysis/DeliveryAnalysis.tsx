@@ -66,6 +66,16 @@ interface IOwnerRiskRow {
     avgRiskScore: number;
 }
 
+interface IResourceAllocationRow {
+    owner: string;
+    taskCount: number;
+    atRiskTasks: number;
+    totalEffort: number;
+    remainingHours: number;
+    completedHours: number;
+    percentComplete: number;
+}
+
 interface IFilterCounts {
     all: number;
     overdue: number;
@@ -99,6 +109,7 @@ interface IAnalysis {
     overrunHours: number;
     riskRows: IRiskRow[];
     ownerRiskRows: IOwnerRiskRow[];
+    resourceRows: IResourceAllocationRow[];
     dueSoonRows: IDueSoonRow[];
     bottlenecks: IRiskRow[];
 }
@@ -155,6 +166,7 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
         const noEstimateTasks = countWithReason(taskFacts, 'No Estimate');
 
         const ownerRiskRows = buildOwnerRiskRows(taskFacts);
+        const resourceRows = buildResourceAllocationRows(taskFacts);
         const ganttOverallPercent = effortRollupService.getTotalStats(workItems).overallPercent;
         const riskDensityPercent = toPercent(riskFacts.length, taskFacts.length);
         const schedulePressurePercent = toPercent(
@@ -221,6 +233,7 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
             overrunHours,
             riskRows,
             ownerRiskRows,
+            resourceRows,
             dueSoonRows,
             bottlenecks: riskRows.slice(0, 10)
         };
@@ -363,46 +376,48 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                     {filteredRiskRows.length === 0 ? (
                         <div className="delivery-empty">No at-risk tasks for the current filter.</div>
                     ) : (
-                        <table className="delivery-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Task</th>
-                                    <th>Owner</th>
-                                    <th>Due</th>
-                                    <th>Remaining</th>
-                                    <th>Overrun</th>
-                                    <th>Risk</th>
-                                    <th>Score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredRiskRows.map(row => (
-                                    <tr key={row.id}>
-                                        <td>
-                                            <button className="delivery-link-btn" onClick={() => handleOpenWorkItem(row.id)}>
-                                                #{row.id}
-                                            </button>
-                                        </td>
-                                        <td title={row.title}>
-                                            <button className="delivery-task-link" onClick={() => handleOpenWorkItem(row.id)}>
-                                                {row.title}
-                                            </button>
-                                        </td>
-                                        <td>{row.owner}</td>
-                                        <td>{row.dueDate ? formatShortDate(row.dueDate) : '-'}</td>
-                                        <td>{row.remainingHours.toFixed(1)}h</td>
-                                        <td>{row.overrunHours.toFixed(1)}h</td>
-                                        <td>
-                                            <span className={`delivery-risk-pill ${row.severity}`}>
-                                                {row.reasons.join(', ')}
-                                            </span>
-                                        </td>
-                                        <td>{row.riskScore}</td>
+                        <div className="delivery-table-wrap">
+                            <table className="delivery-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Task</th>
+                                        <th>Owner</th>
+                                        <th>Due</th>
+                                        <th>Remaining</th>
+                                        <th>Overrun</th>
+                                        <th>Risk</th>
+                                        <th>Score</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {filteredRiskRows.map(row => (
+                                        <tr key={row.id}>
+                                            <td>
+                                                <button className="delivery-link-btn" onClick={() => handleOpenWorkItem(row.id)}>
+                                                    #{row.id}
+                                                </button>
+                                            </td>
+                                            <td title={row.title}>
+                                                <button className="delivery-task-link" onClick={() => handleOpenWorkItem(row.id)}>
+                                                    {row.title}
+                                                </button>
+                                            </td>
+                                            <td>{row.owner}</td>
+                                            <td>{row.dueDate ? formatShortDate(row.dueDate) : '-'}</td>
+                                            <td>{row.remainingHours.toFixed(1)}h</td>
+                                            <td>{row.overrunHours.toFixed(1)}h</td>
+                                            <td>
+                                                <span className={`delivery-risk-pill ${row.severity}`}>
+                                                    {row.reasons.join(', ')}
+                                                </span>
+                                            </td>
+                                            <td>{row.riskScore}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </section>
 
@@ -440,6 +455,42 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                             </tbody>
                         </table>
                     )}
+
+                    <div className="delivery-subsection">
+                        <h4>Resource Allocation (Task-Only)</h4>
+                        {analysis.resourceRows.length === 0 ? (
+                            <div className="delivery-empty">No task-based allocation data available.</div>
+                        ) : (
+                            <div className="delivery-table-wrap">
+                                <table className="delivery-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Owner</th>
+                                            <th>Tasks</th>
+                                            <th>At Risk</th>
+                                            <th>Effort</th>
+                                            <th>Remaining</th>
+                                            <th>Completed</th>
+                                            <th>Progress</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {analysis.resourceRows.map(row => (
+                                            <tr key={row.owner}>
+                                                <td>{row.owner}</td>
+                                                <td>{row.taskCount}</td>
+                                                <td>{row.atRiskTasks}</td>
+                                                <td>{row.totalEffort.toFixed(1)}h</td>
+                                                <td>{row.remainingHours.toFixed(1)}h</td>
+                                                <td>{row.completedHours.toFixed(1)}h</td>
+                                                <td>{row.percentComplete}%</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="delivery-subsection">
                         <h4>Top Bottlenecks</h4>
@@ -696,6 +747,52 @@ function buildOwnerRiskRows(taskFacts: ITaskFact[]): IOwnerRiskRow[] {
             if (b.avgRiskScore !== a.avgRiskScore) return b.avgRiskScore - a.avgRiskScore;
             if (b.remainingHours !== a.remainingHours) return b.remainingHours - a.remainingHours;
             return b.openTasks - a.openTasks;
+        });
+}
+
+function buildResourceAllocationRows(taskFacts: ITaskFact[]): IResourceAllocationRow[] {
+    const map = new Map<string, IResourceAllocationRow>();
+
+    for (const fact of taskFacts) {
+        const key = fact.owner;
+        const normalizedEffort = fact.estimatedHours > 0 ? fact.estimatedHours : fact.forecastHours;
+
+        if (!map.has(key)) {
+            map.set(key, {
+                owner: key,
+                taskCount: 0,
+                atRiskTasks: 0,
+                totalEffort: 0,
+                remainingHours: 0,
+                completedHours: 0,
+                percentComplete: 0
+            });
+        }
+
+        const row = map.get(key)!;
+        row.taskCount += 1;
+        row.atRiskTasks += fact.reasons.length > 0 ? 1 : 0;
+        row.totalEffort += normalizedEffort;
+        row.remainingHours += fact.remainingHours;
+        row.completedHours += fact.completedHours;
+    }
+
+    return Array.from(map.values())
+        .map(row => {
+            const baseline = row.totalEffort > 0 ? row.totalEffort : row.remainingHours + row.completedHours;
+            const progress = baseline > 0 ? ((baseline - row.remainingHours) / baseline) * 100 : 0;
+            return {
+                ...row,
+                totalEffort: round1(row.totalEffort),
+                remainingHours: round1(row.remainingHours),
+                completedHours: round1(row.completedHours),
+                percentComplete: Math.max(0, Math.min(100, Math.round(progress)))
+            };
+        })
+        .sort((a, b) => {
+            if (b.remainingHours !== a.remainingHours) return b.remainingHours - a.remainingHours;
+            if (b.taskCount !== a.taskCount) return b.taskCount - a.taskCount;
+            return a.owner.localeCompare(b.owner);
         });
 }
 
