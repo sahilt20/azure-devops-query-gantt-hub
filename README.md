@@ -183,7 +183,11 @@ src/
 
 ## Version History
 
-### v1.3.6 (Latest)
+### v1.3.7 (Latest)
+- Fixed Delivery Console filter/table mismatch where counts showed but rows did not populate.
+- Aligned risk chip counts with owner-scoped table results and auto-reset invalid owner selections.
+
+### v1.3.6
 - Reworked Delivery Console data pipeline so all filters and counters use one consistent task-facts model.
 - Fixed Overrun calculations using forecast effort (`Completed + Remaining`) and added explicit overrun hours.
 - Improved Delivery Console views: richer at-risk table, owner risk matrix consistency, and clearer risk breakdown.

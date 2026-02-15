@@ -99,7 +99,6 @@ interface IAnalysis {
     ownerRiskRows: IOwnerRiskRow[];
     dueSoonRows: IDueSoonRow[];
     bottlenecks: IRiskRow[];
-    filterCounts: IFilterCounts;
 }
 
 interface IAdvancedMetric {
@@ -198,15 +197,6 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
             .map(toRiskRow)
             .slice(0, 100);
 
-        const filterCounts: IFilterCounts = {
-            all: riskRows.length,
-            overdue: riskRows.filter(r => r.reasons.includes('Overdue')).length,
-            overrun: riskRows.filter(r => r.reasons.includes('Overrun')).length,
-            blocked: riskRows.filter(r => r.reasons.includes('Blocked')).length,
-            unassigned: riskRows.filter(r => r.reasons.includes('Unassigned')).length,
-            noEstimate: riskRows.filter(r => r.reasons.includes('No Estimate')).length
-        };
-
         return {
             totalTasks: tasks.length,
             openTasks: taskFacts.length,
@@ -230,18 +220,39 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
             riskRows,
             ownerRiskRows,
             dueSoonRows,
-            bottlenecks: riskRows.slice(0, 10),
-            filterCounts
+            bottlenecks: riskRows.slice(0, 10)
         };
     }, [workItems]);
 
+    const ownersWithRisk = React.useMemo(() => {
+        return Array.from(new Set(analysis.riskRows.map(r => r.owner))).sort((a, b) => a.localeCompare(b));
+    }, [analysis.riskRows]);
+
+    React.useEffect(() => {
+        if (ownerFilter !== 'all' && !ownersWithRisk.includes(ownerFilter)) {
+            setOwnerFilter('all');
+        }
+    }, [ownerFilter, ownersWithRisk]);
+
+    const ownerScopedRiskRows = React.useMemo(() => {
+        if (ownerFilter === 'all') return analysis.riskRows;
+        return analysis.riskRows.filter(row => row.owner === ownerFilter);
+    }, [analysis.riskRows, ownerFilter]);
+
+    const scopedFilterCounts = React.useMemo((): IFilterCounts => {
+        return {
+            all: ownerScopedRiskRows.length,
+            overdue: ownerScopedRiskRows.filter(r => r.reasons.includes('Overdue')).length,
+            overrun: ownerScopedRiskRows.filter(r => r.reasons.includes('Overrun')).length,
+            blocked: ownerScopedRiskRows.filter(r => r.reasons.includes('Blocked')).length,
+            unassigned: ownerScopedRiskRows.filter(r => r.reasons.includes('Unassigned')).length,
+            noEstimate: ownerScopedRiskRows.filter(r => r.reasons.includes('No Estimate')).length
+        };
+    }, [ownerScopedRiskRows]);
+
     const filteredRiskRows = React.useMemo(() => {
-        return analysis.riskRows.filter(row => {
-            const ownerMatch = ownerFilter === 'all' || row.owner === ownerFilter;
-            const riskMatch = matchesRiskFilter(row, riskFilter);
-            return ownerMatch && riskMatch;
-        });
-    }, [analysis.riskRows, ownerFilter, riskFilter]);
+        return ownerScopedRiskRows.filter(row => matchesRiskFilter(row, riskFilter));
+    }, [ownerScopedRiskRows, riskFilter]);
 
     const actions = React.useMemo(() => getRecommendedActions(analysis), [analysis]);
     const advancedMetrics = React.useMemo(() => buildAdvancedMetrics(analysis), [analysis]);
@@ -274,12 +285,12 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
             <div className="delivery-controls">
                 <div className="delivery-filter-group">
                     <span className="delivery-filter-label">Risk Filter:</span>
-                    <button className={`delivery-chip ${riskFilter === 'all' ? 'active' : ''}`} onClick={() => setRiskFilter('all')}>All ({analysis.filterCounts.all})</button>
-                    <button className={`delivery-chip ${riskFilter === 'overdue' ? 'active' : ''}`} onClick={() => setRiskFilter('overdue')}>Overdue ({analysis.filterCounts.overdue})</button>
-                    <button className={`delivery-chip ${riskFilter === 'overrun' ? 'active' : ''}`} onClick={() => setRiskFilter('overrun')}>Overrun ({analysis.filterCounts.overrun})</button>
-                    <button className={`delivery-chip ${riskFilter === 'blocked' ? 'active' : ''}`} onClick={() => setRiskFilter('blocked')}>Blocked ({analysis.filterCounts.blocked})</button>
-                    <button className={`delivery-chip ${riskFilter === 'unassigned' ? 'active' : ''}`} onClick={() => setRiskFilter('unassigned')}>Unassigned ({analysis.filterCounts.unassigned})</button>
-                    <button className={`delivery-chip ${riskFilter === 'no_estimate' ? 'active' : ''}`} onClick={() => setRiskFilter('no_estimate')}>No Estimate ({analysis.filterCounts.noEstimate})</button>
+                    <button className={`delivery-chip ${riskFilter === 'all' ? 'active' : ''}`} onClick={() => setRiskFilter('all')}>All ({scopedFilterCounts.all})</button>
+                    <button className={`delivery-chip ${riskFilter === 'overdue' ? 'active' : ''}`} onClick={() => setRiskFilter('overdue')}>Overdue ({scopedFilterCounts.overdue})</button>
+                    <button className={`delivery-chip ${riskFilter === 'overrun' ? 'active' : ''}`} onClick={() => setRiskFilter('overrun')}>Overrun ({scopedFilterCounts.overrun})</button>
+                    <button className={`delivery-chip ${riskFilter === 'blocked' ? 'active' : ''}`} onClick={() => setRiskFilter('blocked')}>Blocked ({scopedFilterCounts.blocked})</button>
+                    <button className={`delivery-chip ${riskFilter === 'unassigned' ? 'active' : ''}`} onClick={() => setRiskFilter('unassigned')}>Unassigned ({scopedFilterCounts.unassigned})</button>
+                    <button className={`delivery-chip ${riskFilter === 'no_estimate' ? 'active' : ''}`} onClick={() => setRiskFilter('no_estimate')}>No Estimate ({scopedFilterCounts.noEstimate})</button>
                 </div>
                 <div className="delivery-filter-group">
                     <label className="delivery-filter-label" htmlFor="delivery-owner-filter">Owner:</label>
@@ -290,8 +301,8 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                         onChange={(e) => setOwnerFilter(e.target.value)}
                     >
                         <option value="all">All Owners</option>
-                        {analysis.ownerRiskRows.map(owner => (
-                            <option key={owner.owner} value={owner.owner}>{owner.owner}</option>
+                        {ownersWithRisk.map(owner => (
+                            <option key={owner} value={owner}>{owner}</option>
                         ))}
                     </select>
                     <span className="delivery-filter-count">{filteredRiskRows.length} risk item(s)</span>
