@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { IWorkItemNode } from '../../models/WorkItemModels';
+import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { effortRollupService } from '../../services/EffortRollupService';
 import { addDays, formatShortDate, startOfDay, toDate } from '../../utils/DateUtils';
 import './DeliveryAnalysis.css';
@@ -13,6 +14,9 @@ interface IDeliveryAnalysisProps {
     workItems: IWorkItemNode[];
 }
 
+type RiskReason = 'Overdue' | 'Blocked' | 'Overrun' | 'No Estimate' | 'Unassigned';
+type RiskFilter = 'all' | 'high' | 'overdue' | 'blocked' | 'unassigned' | 'no_estimate';
+
 interface IRiskRow {
     id: number;
     title: string;
@@ -20,19 +24,48 @@ interface IRiskRow {
     state: string;
     dueDate: Date | null;
     remainingHours: number;
+    effortHours: number;
     severity: 'high' | 'medium' | 'low';
-    reasons: string[];
+    reasons: RiskReason[];
+}
+
+interface IDueSoonRow {
+    id: number;
+    title: string;
+    owner: string;
+    dueDate: Date;
+    remainingHours: number;
 }
 
 interface IOwnerLoad {
     owner: string;
     openTasks: number;
     overdueTasks: number;
+    blockedTasks: number;
     remainingHours: number;
 }
 
+interface IAnalysis {
+    totalTasks: number;
+    openTasks: number;
+    doneTasks: number;
+    ganttOverallPercent: number;
+    healthScore: number;
+    overdueTasks: number;
+    dueSoonTasks: number;
+    blockedTasks: number;
+    unassignedTasks: number;
+    noEstimateTasks: number;
+    riskRows: IRiskRow[];
+    ownerLoad: IOwnerLoad[];
+    dueSoonRows: IDueSoonRow[];
+}
+
 export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }) => {
-    const analysis = React.useMemo(() => {
+    const [riskFilter, setRiskFilter] = React.useState<RiskFilter>('all');
+    const [ownerFilter, setOwnerFilter] = React.useState<string>('all');
+
+    const analysis = React.useMemo<IAnalysis>(() => {
         const allItems = flattenHierarchy(workItems);
         const tasks = allItems.filter(item => isTaskWorkItem(item));
         const today = startOfDay(new Date());
@@ -46,10 +79,25 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
             return !!(dueDate && dueDate < today);
         });
 
-        const dueSoonTasks = openTasks.filter(task => {
-            const dueDate = getEffectiveEndDate(task);
-            return !!(dueDate && dueDate >= today && dueDate <= nextWeek);
-        });
+        const dueSoonRows = openTasks
+            .map(task => {
+                const dueDate = getEffectiveEndDate(task);
+                if (!dueDate || dueDate < today || dueDate > nextWeek) return null;
+                return {
+                    id: task.id,
+                    title: task.title,
+                    owner: task.assignedTo || 'Unassigned',
+                    dueDate,
+                    remainingHours: getTaskRemaining(task)
+                } as IDueSoonRow;
+            })
+            .filter((item): item is IDueSoonRow => item !== null)
+            .sort((a, b) => {
+                const byDate = a.dueDate.getTime() - b.dueDate.getTime();
+                if (byDate !== 0) return byDate;
+                return b.remainingHours - a.remainingHours;
+            })
+            .slice(0, 12);
 
         const blockedTasks = openTasks.filter(task => isBlockedState(task.state));
         const unassignedTasks = openTasks.filter(task => isUnassigned(task.assignedTo));
@@ -68,27 +116,45 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
             });
 
         const ownerLoad = buildOwnerLoad(openTasks, today);
-
-        const completionPercent = tasks.length > 0
-            ? Math.round((doneTasks / tasks.length) * 100)
-            : 0;
+        const ganttOverallPercent = effortRollupService.getTotalStats(workItems).overallPercent;
+        const healthScore = calculateHealthScore({
+            openTasks: openTasks.length,
+            overdueTasks: overdueTasks.length,
+            blockedTasks: blockedTasks.length,
+            unassignedTasks: unassignedTasks.length,
+            noEstimateTasks: noEstimateTasks.length
+        });
 
         return {
             totalTasks: tasks.length,
             openTasks: openTasks.length,
             doneTasks,
-            completionPercent,
+            ganttOverallPercent,
+            healthScore,
             overdueTasks: overdueTasks.length,
-            dueSoonTasks: dueSoonTasks.length,
+            dueSoonTasks: dueSoonRows.length,
             blockedTasks: blockedTasks.length,
             unassignedTasks: unassignedTasks.length,
             noEstimateTasks: noEstimateTasks.length,
-            riskRows: riskRows.slice(0, 20),
-            ownerLoad
+            riskRows: riskRows.slice(0, 50),
+            ownerLoad,
+            dueSoonRows
         };
     }, [workItems]);
 
-    const actions = getRecommendedActions(analysis);
+    const filteredRiskRows = React.useMemo(() => {
+        return analysis.riskRows.filter(row => {
+            const ownerMatch = ownerFilter === 'all' || row.owner === ownerFilter;
+            const riskMatch = matchesRiskFilter(row, riskFilter);
+            return ownerMatch && riskMatch;
+        });
+    }, [analysis.riskRows, ownerFilter, riskFilter]);
+
+    const actions = React.useMemo(() => getRecommendedActions(analysis), [analysis]);
+
+    const handleOpenWorkItem = React.useCallback((workItemId: number) => {
+        azureDevOpsService.openWorkItem(workItemId);
+    }, []);
 
     return (
         <div className="delivery-analysis">
@@ -98,14 +164,43 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                 <SummaryCard label="Overdue" value={analysis.overdueTasks} tone="danger" />
                 <SummaryCard label="Blocked" value={analysis.blockedTasks} tone="warning" />
                 <SummaryCard label="Unassigned" value={analysis.unassignedTasks} tone="warning" />
-                <SummaryCard label="Completion" value={`${analysis.completionPercent}%`} tone="success" />
+                <SummaryCard label="No Estimate" value={analysis.noEstimateTasks} tone="warning" />
+                <SummaryCard label="Completion (Gantt)" value={`${analysis.ganttOverallPercent}%`} tone="success" />
+                <SummaryCard label="Delivery Health" value={`${analysis.healthScore}/100`} tone={analysis.healthScore >= 70 ? 'success' : analysis.healthScore >= 45 ? 'warning' : 'danger'} />
+            </div>
+
+            <div className="delivery-controls">
+                <div className="delivery-filter-group">
+                    <span className="delivery-filter-label">Risk Filter:</span>
+                    <button className={`delivery-chip ${riskFilter === 'all' ? 'active' : ''}`} onClick={() => setRiskFilter('all')}>All</button>
+                    <button className={`delivery-chip ${riskFilter === 'high' ? 'active' : ''}`} onClick={() => setRiskFilter('high')}>High</button>
+                    <button className={`delivery-chip ${riskFilter === 'overdue' ? 'active' : ''}`} onClick={() => setRiskFilter('overdue')}>Overdue</button>
+                    <button className={`delivery-chip ${riskFilter === 'blocked' ? 'active' : ''}`} onClick={() => setRiskFilter('blocked')}>Blocked</button>
+                    <button className={`delivery-chip ${riskFilter === 'unassigned' ? 'active' : ''}`} onClick={() => setRiskFilter('unassigned')}>Unassigned</button>
+                    <button className={`delivery-chip ${riskFilter === 'no_estimate' ? 'active' : ''}`} onClick={() => setRiskFilter('no_estimate')}>No Estimate</button>
+                </div>
+                <div className="delivery-filter-group">
+                    <label className="delivery-filter-label" htmlFor="delivery-owner-filter">Owner:</label>
+                    <select
+                        id="delivery-owner-filter"
+                        className="delivery-owner-filter"
+                        value={ownerFilter}
+                        onChange={(e) => setOwnerFilter(e.target.value)}
+                    >
+                        <option value="all">All Owners</option>
+                        {analysis.ownerLoad.map(owner => (
+                            <option key={owner.owner} value={owner.owner}>{owner.owner}</option>
+                        ))}
+                    </select>
+                    <span className="delivery-filter-count">{filteredRiskRows.length} risk item(s)</span>
+                </div>
             </div>
 
             <div className="delivery-panels">
                 <section className="delivery-panel">
                     <h3>At-Risk Tasks</h3>
-                    {analysis.riskRows.length === 0 ? (
-                        <div className="delivery-empty">No at-risk tasks detected in this query.</div>
+                    {filteredRiskRows.length === 0 ? (
+                        <div className="delivery-empty">No at-risk tasks for the current filter.</div>
                     ) : (
                         <table className="delivery-table">
                             <thead>
@@ -120,10 +215,18 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                                 </tr>
                             </thead>
                             <tbody>
-                                {analysis.riskRows.map(row => (
+                                {filteredRiskRows.map(row => (
                                     <tr key={row.id}>
-                                        <td>#{row.id}</td>
-                                        <td title={row.title}>{row.title}</td>
+                                        <td>
+                                            <button className="delivery-link-btn" onClick={() => handleOpenWorkItem(row.id)}>
+                                                #{row.id}
+                                            </button>
+                                        </td>
+                                        <td title={row.title}>
+                                            <button className="delivery-task-link" onClick={() => handleOpenWorkItem(row.id)}>
+                                                {row.title}
+                                            </button>
+                                        </td>
                                         <td>{row.owner}</td>
                                         <td>{row.state || '-'}</td>
                                         <td>{row.dueDate ? formatShortDate(row.dueDate) : '-'}</td>
@@ -149,8 +252,9 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                             <thead>
                                 <tr>
                                     <th>Owner</th>
-                                    <th>Open Tasks</th>
+                                    <th>Open</th>
                                     <th>Overdue</th>
+                                    <th>Blocked</th>
                                     <th>Remaining</th>
                                 </tr>
                             </thead>
@@ -160,6 +264,7 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                                         <td>{owner.owner}</td>
                                         <td>{owner.openTasks}</td>
                                         <td>{owner.overdueTasks}</td>
+                                        <td>{owner.blockedTasks}</td>
                                         <td>{owner.remainingHours.toFixed(1)}h</td>
                                     </tr>
                                 ))}
@@ -169,16 +274,39 @@ export const DeliveryAnalysis: React.FC<IDeliveryAnalysisProps> = ({ workItems }
                 </section>
 
                 <section className="delivery-panel">
-                    <h3>Recommended Actions</h3>
-                    {actions.length === 0 ? (
-                        <div className="delivery-empty">No immediate actions required.</div>
-                    ) : (
-                        <ol className="delivery-actions">
-                            {actions.map(action => (
-                                <li key={action}>{action}</li>
-                            ))}
-                        </ol>
-                    )}
+                    <h3>Action Center</h3>
+                    <div className="delivery-subsection">
+                        <h4>Due In Next 7 Days</h4>
+                        {analysis.dueSoonRows.length === 0 ? (
+                            <div className="delivery-empty">No tasks due in the next 7 days.</div>
+                        ) : (
+                            <ul className="delivery-due-list">
+                                {analysis.dueSoonRows.map(item => (
+                                    <li key={item.id}>
+                                        <button className="delivery-task-link" onClick={() => handleOpenWorkItem(item.id)}>
+                                            #{item.id} {item.title}
+                                        </button>
+                                        <span className="delivery-due-meta">
+                                            {formatShortDate(item.dueDate)} • {item.owner} • {item.remainingHours.toFixed(1)}h
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="delivery-subsection">
+                        <h4>Recommended Actions</h4>
+                        {actions.length === 0 ? (
+                            <div className="delivery-empty">No immediate actions required.</div>
+                        ) : (
+                            <ol className="delivery-actions">
+                                {actions.map(action => (
+                                    <li key={action}>{action}</li>
+                                ))}
+                            </ol>
+                        )}
+                    </div>
                 </section>
             </div>
         </div>
@@ -247,7 +375,7 @@ function getEffectiveEndDate(task: IWorkItemNode): Date | null {
 }
 
 function buildRiskRow(task: IWorkItemNode, today: Date): IRiskRow | null {
-    const reasons: string[] = [];
+    const reasons: RiskReason[] = [];
     const dueDate = getEffectiveEndDate(task);
     const effort = getTaskEffort(task);
     const remaining = getTaskRemaining(task);
@@ -260,9 +388,9 @@ function buildRiskRow(task: IWorkItemNode, today: Date): IRiskRow | null {
 
     if (reasons.length === 0) return null;
 
-    const severity: IRiskRow['severity'] = reasons.some(reason => reason === 'Overdue' || reason === 'Blocked')
+    const severity: IRiskRow['severity'] = reasons.includes('Overdue') || reasons.includes('Blocked')
         ? 'high'
-        : reasons.some(reason => reason === 'Overrun' || reason === 'No Estimate')
+        : reasons.includes('Overrun') || reasons.includes('No Estimate')
             ? 'medium'
             : 'low';
 
@@ -273,6 +401,7 @@ function buildRiskRow(task: IWorkItemNode, today: Date): IRiskRow | null {
         state: task.state,
         dueDate,
         remainingHours: remaining,
+        effortHours: effort,
         severity,
         reasons
     };
@@ -288,6 +417,7 @@ function buildOwnerLoad(openTasks: IWorkItemNode[], today: Date): IOwnerLoad[] {
                 owner,
                 openTasks: 0,
                 overdueTasks: 0,
+                blockedTasks: 0,
                 remainingHours: 0
             });
         }
@@ -300,6 +430,10 @@ function buildOwnerLoad(openTasks: IWorkItemNode[], today: Date): IOwnerLoad[] {
         if (dueDate && dueDate < today) {
             entry.overdueTasks += 1;
         }
+
+        if (isBlockedState(task.state)) {
+            entry.blockedTasks += 1;
+        }
     }
 
     return Array.from(ownerMap.values()).sort((a, b) => {
@@ -310,32 +444,57 @@ function buildOwnerLoad(openTasks: IWorkItemNode[], today: Date): IOwnerLoad[] {
     });
 }
 
-function getRecommendedActions(analysis: {
+function calculateHealthScore(input: {
+    openTasks: number;
     overdueTasks: number;
     blockedTasks: number;
     unassignedTasks: number;
     noEstimateTasks: number;
-    dueSoonTasks: number;
-}): string[] {
+}): number {
+    if (input.openTasks <= 0) return 100;
+
+    const overduePenalty = (input.overdueTasks / input.openTasks) * 40;
+    const blockedPenalty = (input.blockedTasks / input.openTasks) * 30;
+    const unassignedPenalty = (input.unassignedTasks / input.openTasks) * 20;
+    const noEstimatePenalty = (input.noEstimateTasks / input.openTasks) * 10;
+
+    const score = Math.round(100 - overduePenalty - blockedPenalty - unassignedPenalty - noEstimatePenalty);
+    return Math.max(0, Math.min(100, score));
+}
+
+function matchesRiskFilter(row: IRiskRow, filter: RiskFilter): boolean {
+    if (filter === 'all') return true;
+    if (filter === 'high') return row.severity === 'high';
+    if (filter === 'overdue') return row.reasons.includes('Overdue');
+    if (filter === 'blocked') return row.reasons.includes('Blocked');
+    if (filter === 'unassigned') return row.reasons.includes('Unassigned');
+    if (filter === 'no_estimate') return row.reasons.includes('No Estimate');
+    return true;
+}
+
+function getRecommendedActions(analysis: IAnalysis): string[] {
     const actions: string[] = [];
 
     if (analysis.overdueTasks > 0) {
-        actions.push(`Review ${analysis.overdueTasks} overdue task(s) and reset due dates or scope today.`);
+        actions.push(`Review ${analysis.overdueTasks} overdue task(s) and re-baseline due dates/scope.`);
     }
     if (analysis.blockedTasks > 0) {
-        actions.push(`Escalate ${analysis.blockedTasks} blocked task(s) and assign unblock owners.`);
+        actions.push(`Escalate ${analysis.blockedTasks} blocked task(s) and assign an unblock owner by EOD.`);
     }
     if (analysis.unassignedTasks > 0) {
         actions.push(`Assign owners for ${analysis.unassignedTasks} unassigned task(s).`);
     }
     if (analysis.noEstimateTasks > 0) {
-        actions.push(`Add effort estimates to ${analysis.noEstimateTasks} task(s) for reliable forecasting.`);
+        actions.push(`Add estimates for ${analysis.noEstimateTasks} task(s) to improve forecasting accuracy.`);
     }
     if (analysis.dueSoonTasks > 0) {
-        actions.push(`Validate completion plan for ${analysis.dueSoonTasks} task(s) due in the next 7 days.`);
+        actions.push(`Validate readiness for ${analysis.dueSoonTasks} task(s) due in the next 7 days.`);
+    }
+    if (analysis.ganttOverallPercent < 50 && analysis.openTasks > 0) {
+        actions.push('Run a scope-risk review this week: progress is below 50% for current selection.');
     }
 
-    return actions;
+    return actions.slice(0, 8);
 }
 
 export default DeliveryAnalysis;
