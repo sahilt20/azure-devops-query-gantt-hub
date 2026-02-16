@@ -20,6 +20,7 @@ const WORK_ITEM_FIELDS = [
     'System.Title',
     'System.WorkItemType',
     'System.State',
+    'System.CreatedDate',
     'System.AssignedTo',
     'System.Parent',
     'System.IterationPath',
@@ -34,6 +35,15 @@ const WORK_ITEM_FIELDS = [
     'Microsoft.VSTS.Scheduling.CompletedWork',
     'Microsoft.VSTS.Common.ClosedDate'
 ];
+
+interface IClassificationNode {
+    path?: string;
+    attributes?: {
+        startDate?: string;
+        finishDate?: string;
+    };
+    children?: IClassificationNode[];
+}
 
 class AzureDevOpsService {
     private static instance: AzureDevOpsService;
@@ -196,6 +206,51 @@ class AzureDevOpsService {
      */
     public getProjectId(): string | null {
         return this.projectId;
+    }
+
+    /**
+     * Get iteration start/end dates keyed by iteration path
+     */
+    public async getIterationDateMap(): Promise<Record<string, { start: Date | null; end: Date | null }>> {
+        await this.initialize();
+
+        if (!this.organization || !this.projectName) {
+            return {};
+        }
+
+        try {
+            const url = `https://dev.azure.com/${this.organization}/${encodeURIComponent(this.projectName)}/_apis/wit/classificationnodes/iterations?$depth=10&api-version=7.0`;
+            const root = await this.makeApiRequest<IClassificationNode>(url);
+            const result: Record<string, { start: Date | null; end: Date | null }> = {};
+            const normalizedProjectPrefix = `${this.projectName.toLowerCase()}\\`;
+
+            const visit = (node: IClassificationNode) => {
+                const normalizedPath = this.normalizeIterationPath(node.path);
+                const start = this.parseDate(node.attributes?.startDate);
+                const end = this.parseDate(node.attributes?.finishDate);
+
+                if (normalizedPath && (start || end)) {
+                    result[normalizedPath] = { start, end };
+
+                    if (normalizedPath.startsWith(normalizedProjectPrefix)) {
+                        const withoutProject = normalizedPath.slice(normalizedProjectPrefix.length);
+                        if (withoutProject) {
+                            result[withoutProject] = { start, end };
+                        }
+                    }
+                }
+
+                for (const child of node.children || []) {
+                    visit(child);
+                }
+            };
+
+            visit(root);
+            return result;
+        } catch (error) {
+            console.warn('[AzureDevOpsService] Failed to fetch iteration date map:', error);
+            return {};
+        }
     }
 
     /**
@@ -427,6 +482,21 @@ class AzureDevOpsService {
             { referenceName: 'Microsoft.VSTS.Common.Priority', name: 'Priority', type: 'integer', isNumeric: true },
             { referenceName: 'Microsoft.VSTS.Common.StackRank', name: 'Stack Rank', type: 'double', isNumeric: true }
         ];
+    }
+
+    private parseDate(value: string | undefined): Date | null {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    private normalizeIterationPath(path: string | undefined): string {
+        if (!path) return '';
+        return path
+            .replace(/\//g, '\\')
+            .replace(/^\\+/, '')
+            .trim()
+            .toLowerCase();
     }
 }
 

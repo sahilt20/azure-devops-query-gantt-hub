@@ -212,38 +212,39 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                     <h5>Tasks</h5>
                                     <ul>
                                         <li>Uses Start Date + Planned Hours (7-hour working day)</li>
-                                        <li>Falls back to inherited start date from parent + Planned Hours</li>
                                         <li>Falls back to Iteration Path start + Planned Hours</li>
-                                        <li>Falls back to Created Date</li>
+                                        <li>Falls back to parent-chain Start Date + Planned Hours</li>
+                                        <li>Falls back to work item's Created Date</li>
                                     </ul>
 
                                     <h5>PBIs & Bugs</h5>
                                     <ul>
                                         <li>Uses Start Date → Dev/QA Completion Date</li>
-                                        <li>Falls back to inherited start date or earliest child start date</li>
+                                        <li>Falls back to Iteration Path start, then parent-chain Start Date</li>
                                         <li>Calculates end date from sum of child Planned Hours</li>
-                                        <li>Falls back to Created Date</li>
+                                        <li>Falls back to work item's Created Date</li>
                                     </ul>
 
                                     <h5>Features & Epics</h5>
                                     <ul>
                                         <li>Uses Start Date → Target Date</li>
-                                        <li>Falls back to inherited start date or child date range</li>
+                                        <li>Falls back to Iteration Path start, then parent-chain Start Date</li>
                                         <li>Estimates duration based on children if no explicit dates</li>
-                                        <li>Falls back to Created Date</li>
+                                        <li>Falls back to work item's Created Date</li>
                                     </ul>
 
                                     <h4>Start Date Inheritance</h4>
                                     <p>
-                                        <strong>Important:</strong> If a work item doesn't have an explicit start date, it inherits from its parent work item.
-                                        This inheritance continues up the hierarchy until a start date is found.
+                                        <strong>Important:</strong> Start date resolution always follows this order:
+                                        work item Start Date → Iteration Start Date → parent-chain Start Date → work item Created Date.
                                     </p>
                                     <p>
-                                        For example: If a Task has no start date, it checks its parent PBI. If the PBI has no start date,
-                                        it checks the parent Feature, and so on. If no ancestor has a start date, the work item's Created Date is used.
+                                        For example: If a Task has no Start Date, it first checks the assigned Iteration start.
+                                        If that is unavailable, it checks parent PBI, then Feature, then Epic start dates.
+                                        If no ancestor has a Start Date, the task Created Date is used.
                                     </p>
                                     <p>
-                                        This ensures that work items without explicit dates still appear in a reasonable timeline position.
+                                        This ensures every work item has a start date and can always be rendered on the Gantt timeline.
                                     </p>
 
                                     <h4>Timeline Scaling</h4>
@@ -346,8 +347,8 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
 
                                         <dt>Valid Dates</dt>
                                         <dd>
-                                            Indicates whether a work item has real dates (explicit or inherited)
-                                            or is using default estimated dates. Items without valid dates show a dashed border.
+                                            Indicates whether a work item uses explicit timeline dates.
+                                            If explicit dates are missing, fallback logic still resolves timeline dates.
                                         </dd>
                                     </dl>
                                 </div>

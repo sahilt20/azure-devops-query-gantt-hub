@@ -20,6 +20,7 @@ import { parseAzureDate, minDate, maxDate, addDays, addWorkingHours } from '../u
 
 class WorkItemHierarchyService {
     private static instance: WorkItemHierarchyService;
+    private iterationDateMap: Map<string, { start: Date | null; end: Date | null }> = new Map();
 
     private constructor() { }
 
@@ -30,12 +31,18 @@ class WorkItemHierarchyService {
         return WorkItemHierarchyService.instance;
     }
 
+    public setIterationDateMap(iterationDateMap: Record<string, { start: Date | null; end: Date | null }>): void {
+        this.iterationDateMap = new Map(Object.entries(iterationDateMap));
+    }
+
     /**
          * Convert Azure DevOps WorkItem to IWorkItemNode
          */
     public convertToNode(workItem: WorkItem): IWorkItemNode {
         const fields = workItem.fields || {};
         const workItemType = this.normalizeWorkItemType(fields['System.WorkItemType']);
+        const iterationPath = (fields['System.IterationPath'] as string) || '';
+        const iterationDates = this.parseIterationDates(iterationPath);
 
         // Get field config for dynamic field mapping
         const fieldConfig = this.getFieldConfig();
@@ -61,8 +68,9 @@ class WorkItemHierarchyService {
             targetDate: parseAzureDate(fields['Microsoft.VSTS.Scheduling.TargetDate']),
             devCompletionDate: parseAzureDate(fields['Custom.DevCompletionDate'] || fields['Microsoft.VSTS.Scheduling.FinishDate']),
             qaCompletionDate: parseAzureDate(fields['Custom.QACompletionDate']),
-            iterationStartDate: this.parseIterationDates(fields['System.IterationPath'])?.start || null,
-            iterationEndDate: this.parseIterationDates(fields['System.IterationPath'])?.end || null,
+            iterationStartDate: iterationDates?.start || null,
+            iterationEndDate: iterationDates?.end || null,
+            iterationPath,
             parentId: this.parseNumber(fields['System.Parent']) || null,
             level: WorkItemTypeLevel[workItemType],
             isExpanded: true,
@@ -95,11 +103,21 @@ class WorkItemHierarchyService {
 
     /**
      * Parse iteration path to get start and end dates
-     * Note: This is a placeholder - actual implementation would need to query iteration info
      */
-    private parseIterationDates(_iterationPath: string | undefined): { start: Date | null; end: Date | null } | null {
-        // In a real implementation, we would query the iteration API
-        // For now, return null and fall back to other date logic
+    private parseIterationDates(iterationPath: string | undefined): { start: Date | null; end: Date | null } | null {
+        const normalizedPath = this.normalizeIterationPath(iterationPath);
+        if (!normalizedPath) return null;
+
+        const segments = normalizedPath.split('\\');
+        while (segments.length > 0) {
+            const candidate = segments.join('\\');
+            const dates = this.iterationDateMap.get(candidate);
+            if (dates && (dates.start || dates.end)) {
+                return dates;
+            }
+            segments.pop();
+        }
+
         return null;
     }
 
@@ -223,29 +241,38 @@ class WorkItemHierarchyService {
     }
 
     /**
-     * Get inherited start date by traversing up the parent chain
-     * Returns the first non-null calculatedStartDate or startDate found in parent chain
-     * Falls back to createdDate if no parent has a start date
+     * Resolve start date using strict fallback order:
+     * 1) own Start Date
+     * 2) own Iteration Start Date
+     * 3) ancestor Start Date chain
+     * 4) own Created Date
+     * 5) current date (safety fallback)
      */
-    private getInheritedStartDate(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): Date | null {
-        // If node has its own start date, return it
+    private resolveStartDate(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): Date {
         if (node.startDate) return node.startDate;
+        if (node.iterationStartDate) return node.iterationStartDate;
 
-        // Traverse up parent chain
+        const ancestorStart = this.getAncestorStartDate(node, nodeMap);
+        if (ancestorStart) return ancestorStart;
+
+        return node.createdDate || new Date();
+    }
+
+    private getAncestorStartDate(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): Date | null {
+        const visited = new Set<number>([node.id]);
         let currentNode = node;
+
         while (currentNode.parentId) {
             const parent = nodeMap.get(currentNode.parentId);
-            if (!parent) break;
+            if (!parent || visited.has(parent.id)) break;
 
-            // Check if parent has a calculated or explicit start date
-            if (parent.calculatedStartDate) return parent.calculatedStartDate;
             if (parent.startDate) return parent.startDate;
 
+            visited.add(parent.id);
             currentNode = parent;
         }
 
-        // No parent with start date found - use created date as fallback
-        return node.createdDate;
+        return null;
     }
 
     /**
@@ -253,13 +280,15 @@ class WorkItemHierarchyService {
      * Uses different logic for Feature/Epic, PBI/Bug, and Task
      */
     private calculateDateRanges(nodes: IWorkItemNode[]): void {
-        // Build node map for parent lookup
         const nodeMap = this.buildNodeMap(nodes);
+        this.calculateDateRangesRecursive(nodes, nodeMap);
+    }
 
+    private calculateDateRangesRecursive(nodes: IWorkItemNode[], nodeMap: Map<number, IWorkItemNode>): void {
         for (const node of nodes) {
             // Recursively calculate for children first
             if (node.children.length > 0) {
-                this.calculateDateRanges(node.children);
+                this.calculateDateRangesRecursive(node.children, nodeMap);
             }
 
             // Calculate based on work item type
@@ -285,13 +314,13 @@ class WorkItemHierarchyService {
     /**
      * Calculate dates for Task work items
      * - Use Start Date + Planned Hours (7h working day)
-     * - Fallback to inherited start date from parent + Planned Hours
      * - Fallback to Iteration Path start + Planned Hours
-     * - Fallback to created date
+     * - Fallback to parent-chain Start Date + Planned Hours
+     * - Fallback to work item Created Date
      * - Default: 2 days, frame-only bar
      */
     private calculateTaskDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap) || node.iterationStartDate;
+        const startDate = this.resolveStartDate(node, nodeMap);
         const plannedHours = node.plannedHours || node.originalEstimate || node.effort || 0;
         const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
@@ -311,20 +340,20 @@ class WorkItemHierarchyService {
             node.hasValidDates = true;
         } else {
             // No dates - use default 2 days
-            this.setDefaultDates(node);
+            this.setDefaultDates(node, nodeMap);
         }
     }
 
     /**
      * Calculate dates for PBI/Bug work items
      * - Use Start Date → Dev/QA Completion Date
-     * - Fallback: inherited start date from parent or earliest child Start Date + sum of Planned Hours (7h working day)
-     * - Fallback: created date
+     * - Fallback: Iteration Start Date, then parent-chain Start Date
+     * - Fallback: work item Created Date
      * - Default: 2 days, frame-only bar
      */
     private calculatePBIBugDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
         const completionDate = node.devCompletionDate || node.qaCompletionDate || node.targetDate;
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const startDate = this.resolveStartDate(node, nodeMap);
 
         if (startDate && completionDate) {
             // Has explicit dates
@@ -354,7 +383,7 @@ class WorkItemHierarchyService {
                 }
                 node.hasValidDates = !!(node.calculatedStartDate && node.calculatedEndDate);
             } else {
-                this.setDefaultDates(node);
+                this.setDefaultDates(node, nodeMap);
             }
         } else if (startDate) {
             // Has only start date (explicit or inherited)
@@ -376,19 +405,19 @@ class WorkItemHierarchyService {
             node.hasValidDates = true;
         } else {
             // No dates, no children
-            this.setDefaultDates(node);
+            this.setDefaultDates(node, nodeMap);
         }
     }
 
     /**
      * Calculate dates for Feature/Epic work items
      * - Use Start Date → Target Date
-     * - Fallback: inherited start date from parent or earliest child Start Date → longest child Dev/QA Completion Date
-     * - Fallback: created date
+     * - Fallback: Iteration Start Date, then parent-chain Start Date
+     * - Fallback: work item Created Date
      * - Default: 2 days, frame-only bar
      */
     private calculateFeatureEpicDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const startDate = this.resolveStartDate(node, nodeMap);
         const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
         if (startDate && endDate) {
@@ -410,7 +439,7 @@ class WorkItemHierarchyService {
                 node.calculatedEndDate = addDays(node.calculatedStartDate, 14);
                 node.hasValidDates = true;
             } else {
-                this.setDefaultDates(node);
+                this.setDefaultDates(node, nodeMap);
             }
         } else if (startDate) {
             // Has only start date (explicit or inherited)
@@ -424,7 +453,7 @@ class WorkItemHierarchyService {
             node.hasValidDates = true;
         } else {
             // No dates, no children
-            this.setDefaultDates(node);
+            this.setDefaultDates(node, nodeMap);
         }
     }
 
@@ -432,7 +461,7 @@ class WorkItemHierarchyService {
      * Calculate dates for unknown work item types
      */
     private calculateDefaultDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
-        const startDate = node.startDate || this.getInheritedStartDate(node, nodeMap);
+        const startDate = this.resolveStartDate(node, nodeMap);
         const endDate = node.targetDate || node.devCompletionDate || node.qaCompletionDate;
 
         if (startDate && endDate) {
@@ -453,18 +482,17 @@ class WorkItemHierarchyService {
             node.calculatedEndDate = endDate;
             node.hasValidDates = true;
         } else {
-            this.setDefaultDates(node);
+            this.setDefaultDates(node, nodeMap);
         }
     }
 
     /**
-     * Set default 2-day duration (frame-only bar)
+     * Set default 2-day duration when only fallback dates are available
      */
-    private setDefaultDates(node: IWorkItemNode): void {
-        const today = new Date();
-        node.calculatedStartDate = node.startDate || today;
+    private setDefaultDates(node: IWorkItemNode, nodeMap: Map<number, IWorkItemNode>): void {
+        node.calculatedStartDate = this.resolveStartDate(node, nodeMap);
         node.calculatedEndDate = addDays(node.calculatedStartDate, 2);
-        node.hasValidDates = false;
+        node.hasValidDates = true;
     }
 
     /**
@@ -598,6 +626,15 @@ class WorkItemHierarchyService {
             return isNaN(parsed) ? 0 : parsed;
         }
         return 0;
+    }
+
+    private normalizeIterationPath(path: string | undefined): string {
+        if (!path) return '';
+        return path
+            .replace(/\//g, '\\')
+            .replace(/^\\+/, '')
+            .trim()
+            .toLowerCase();
     }
 }
 

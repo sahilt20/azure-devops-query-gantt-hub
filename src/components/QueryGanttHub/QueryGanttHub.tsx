@@ -86,6 +86,7 @@ export const QueryGanttHub: React.FC = () => {
                 // Simulate loading delay
                 await new Promise(resolve => setTimeout(resolve, 500));
                 const mockData = generateSampleWorkItems();
+                workItemHierarchyService.setIterationDateMap({});
                 effortRollupService.calculateRollup(mockData);
                 setWorkItems(mockData);
                 setDebugInfo(`Loaded ${mockData.length} sample work items`);
@@ -124,10 +125,14 @@ export const QueryGanttHub: React.FC = () => {
                 return;
             }
 
-            setDebugInfo(`Fetching ${workItemIds.length} work items...`);
+            setDebugInfo(`Fetching ${workItemIds.length} work items and iteration dates...`);
 
-            // Fetch work items with details
-            const rawWorkItems = await azureDevOpsService.getWorkItems(workItemIds);
+            // Fetch work items and iteration metadata together
+            const [rawWorkItems, iterationDateMap] = await Promise.all([
+                azureDevOpsService.getWorkItems(workItemIds),
+                azureDevOpsService.getIterationDateMap()
+            ]);
+            workItemHierarchyService.setIterationDateMap(iterationDateMap);
             setDebugInfo(`Retrieved ${rawWorkItems.length} work items, building hierarchy...`);
 
             // Build hierarchy
@@ -191,6 +196,7 @@ export const QueryGanttHub: React.FC = () => {
                 // Simulate loading delay
                 await new Promise(resolve => setTimeout(resolve, 500));
                 const mockData = generateSampleWorkItems();
+                workItemHierarchyService.setIterationDateMap({});
                 effortRollupService.calculateRollup(mockData);
                 setWorkItems(mockData);
                 setDebugInfo(`Loaded ${mockData.length} sample work items`);
@@ -198,7 +204,11 @@ export const QueryGanttHub: React.FC = () => {
             }
 
             setDebugInfo('Loading all work items...');
-            const rawWorkItems = await azureDevOpsService.getHierarchicalWorkItems();
+            const [rawWorkItems, iterationDateMap] = await Promise.all([
+                azureDevOpsService.getHierarchicalWorkItems(),
+                azureDevOpsService.getIterationDateMap()
+            ]);
+            workItemHierarchyService.setIterationDateMap(iterationDateMap);
             setDebugInfo(`Found ${rawWorkItems.length} work items, building hierarchy...`);
 
             const hierarchy = workItemHierarchyService.buildHierarchy(rawWorkItems);

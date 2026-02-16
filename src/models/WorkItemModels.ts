@@ -28,6 +28,7 @@ export interface IWorkItemNode {
     qaCompletionDate: Date | null;   // QA Completion Date for PBI/Bug
     iterationStartDate: Date | null; // Iteration Path start date
     iterationEndDate: Date | null;   // Iteration Path end date
+    iterationPath: string;           // System.IterationPath
 
     // Hierarchy
     parentId: number | null;
@@ -175,6 +176,7 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         qaCompletionDate: null,
         iterationStartDate: null,
         iterationEndDate: null,
+        iterationPath: '',
         parentId: null,
         children: [],
         level: 0,

@@ -164,7 +164,12 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.1 (Latest)
+### v1.2.33 (Latest)
+- Fixed start-date resolution so each work item follows: Start Date -> Iteration Start Date -> Parent-chain Start Date -> Created Date.
+- Added iteration metadata lookup from Azure DevOps iterations so sprint start dates are used when item start date is blank.
+- Enhanced Gantt hover details with owner, iteration path, effort, remaining, completed, and effective start/end dates.
+
+### v1.2.1
 - ✅ Auto-calculated Done % from Effort and Remaining fields
 - ✅ Timeline properly scales when switching Day/Week/Month views
 - ✅ Enhanced query selector with solid background and folder grouping

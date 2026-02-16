@@ -4,10 +4,11 @@
  */
 
 import React from 'react';
-import { IWorkItemNode, WorkItemTypeColors } from '../../models/WorkItemModels';
+import { IWorkItemNode } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { getWorkItemTypeClass } from '../../utils/WorkItemTypeUtils';
 import { effortRollupService } from '../../services/EffortRollupService';
+import { buildWorkItemTooltip, getEffectiveStartDate } from '../../utils/WorkItemTooltipUtils';
 
 interface IGanttBarProps {
     workItem: IWorkItemNode;
@@ -22,9 +23,11 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     widthPercent,
     onClick
 }) => {
-    const hasValidDates = startPercent >= 0 && widthPercent > 0;
+    const hasTimelinePosition = startPercent >= 0 && widthPercent >= 0;
     const hasRealDates = workItem.hasValidDates;
     const isRemoved = effortRollupService.isRemovedState(workItem.state);
+    const hasResolvedStartDate = !!getEffectiveStartDate(workItem);
+    const tooltipText = buildWorkItemTooltip(workItem);
 
     const typeClass = getWorkItemTypeClass(workItem.workItemType);
 
@@ -44,19 +47,18 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
         }
     };
 
-    if (!hasValidDates) {
-        const hasStartDate = !!(workItem.startDate);
-        const noDateLabel = hasStartDate ? '' : 'No start date';
+    if (!hasTimelinePosition) {
+        const noDateLabel = hasResolvedStartDate ? '' : 'No start date';
 
-        // Show a placeholder bar for items without start dates
+        // Show a placeholder bar only when timeline placement still fails
         return (
             <div
-                className="gantt-bar no-dates"
+                className={`gantt-bar ${typeClass} ${hasResolvedStartDate ? '' : 'no-dates'} ${isRemoved ? 'gantt-bar-removed' : ''}`}
                 style={{
                     left: '5%',
                     width: '15%'
                 }}
-                title={`${workItem.title}${noDateLabel ? ' - ' + noDateLabel : ''}\nClick to open in Azure DevOps`}
+                title={tooltipText}
                 onClick={handleClick}
             >
                 {noDateLabel && (
@@ -73,7 +75,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
     const clampedWidth = Math.max(1, Math.min(100 - clampedStart, widthPercent));
 
     // Determine if this is a frame-only bar (default 2-day duration)
-    const isFrameOnly = !hasRealDates;
+    const isFrameOnly = !hasRealDates && !hasResolvedStartDate;
 
     return (
         <div
@@ -84,7 +86,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                 cursor: 'pointer'
             }}
             onClick={handleClick}
-            title={`${workItem.title}\n${workItem.percentComplete}% complete\nEffort: ${workItem.rollupEffort}h\nRemaining: ${workItem.rollupRemainingWork}h\nClick to open in Azure DevOps`}
+            title={tooltipText}
         >
             {/* Progress fill - only show for items with valid dates */}
             {!isFrameOnly && (
@@ -94,7 +96,7 @@ export const GanttBar: React.FC<IGanttBarProps> = ({
                 />
             )}
             {/* Show label text for frame-only bars without start date */}
-            {isFrameOnly && !workItem.startDate && (
+            {isFrameOnly && !hasResolvedStartDate && (
                 <div className="gantt-bar-content">
                     No start date
                 </div>

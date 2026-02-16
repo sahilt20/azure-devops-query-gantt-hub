@@ -24,9 +24,9 @@ A Gantt Chart hub for Azure DevOps that visualizes work items from any saved que
 
 ### Smart Date Calculations
 - Uses all available date fields: Start Date, Target Date, Finish Date, Dev Completion Date, QA Completion Date
-- Inherits start dates from parent items when not set on the item itself
+- Start fallback order for every work item: Work Item Start Date -> Iteration Start Date -> Parent-chain Start Date -> Work Item Created Date
 - Calculates end dates from planned hours using a 7-hour working day (skips weekends)
-- Items without a start date show "No start date" on their bar
+- Ensures every work item has a resolved start date for timeline placement
 
 ### Visual Indicators
 - Remaining work shown in red when it exceeds planned effort
@@ -66,9 +66,9 @@ A Gantt Chart hub for Azure DevOps that visualizes work items from any saved que
 
 | Level            | Start Date                                             | End Date                                              |
 | ---------------- | ------------------------------------------------------ | ----------------------------------------------------- |
-| **Task**         | Start Date or inherited from parent                    | Start + Planned Hours (7h/day) or Target/Finish Date  |
-| **Bug/PBI**      | Start Date or inherited from parent                    | Dev Completion, QA Completion, Target, or Finish Date |
-| **Feature/Epic** | Start Date or inherited from parent, or earliest child | Target Date, Finish Date, or latest child end date    |
+| **Task**         | Start Date -> Iteration Start -> Parent Start Chain -> Created Date | Start + Planned Hours (7h/day) or Target/Finish Date  |
+| **Bug/PBI**      | Start Date -> Iteration Start -> Parent Start Chain -> Created Date | Dev Completion, QA Completion, Target, or Finish Date |
+| **Feature/Epic** | Start Date -> Iteration Start -> Parent Start Chain -> Created Date | Target Date, Finish Date, or latest child end date    |
 
 ## How to Use
 

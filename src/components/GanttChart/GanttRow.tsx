@@ -9,6 +9,7 @@ import { IWorkItemNode } from '../../models/WorkItemModels';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { getWorkItemTypeClass, getWorkItemTypeAbbreviation, getCustomTypeColor, isCustomType } from '../../utils/WorkItemTypeUtils';
 import { effortRollupService } from '../../services/EffortRollupService';
+import { buildWorkItemTooltip } from '../../utils/WorkItemTooltipUtils';
 
 interface IColumnWidths {
     title: number;
@@ -40,6 +41,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     const isCustom = isCustomType(workItem.workItemType);
     const customColor = isCustom ? getCustomTypeColor(workItem.workItemType) : undefined;
     const isRemoved = effortRollupService.isRemovedState(workItem.state);
+    const tooltipText = buildWorkItemTooltip(workItem);
 
 
 
@@ -97,7 +99,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                     href={workItemUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`${workItem.title}\nClick to open in Azure DevOps`}
+                    title={tooltipText}
                     onClick={handleTitleClick}
                 >
                     {workItem.title}

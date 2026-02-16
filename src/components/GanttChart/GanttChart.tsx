@@ -107,6 +107,8 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
 
         for (const item of flattenedItems) {
             if (item.startDate) startDates.push(item.startDate);
+            if (item.iterationStartDate) startDates.push(item.iterationStartDate);
+            if (item.createdDate) startDates.push(item.createdDate);
             if (item.calculatedStartDate) startDates.push(item.calculatedStartDate);
             if (item.targetDate) endDates.push(item.targetDate);
             if (item.calculatedEndDate) endDates.push(item.calculatedEndDate);
@@ -259,16 +261,21 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
 
     // Calculate bar position
     const getBarPosition = (item: IWorkItemNode) => {
-        const start = item.calculatedStartDate || item.startDate;
-        const end = item.calculatedEndDate || item.targetDate;
+        const start = item.calculatedStartDate || item.startDate || item.iterationStartDate || item.createdDate;
+        const end = item.calculatedEndDate || item.targetDate || item.devCompletionDate || item.qaCompletionDate || (start ? addDays(start, 1) : null);
 
         if (!start || !end) {
             return { startPercent: -1, widthPercent: 0 };
         }
 
-        const startPercent = getDatePositionPercent(start, dateRange.start, dateRange.end);
-        const endPercent = getDatePositionPercent(end, dateRange.start, dateRange.end);
-        return { startPercent, widthPercent: endPercent - startPercent };
+        let startPercent = getDatePositionPercent(start, dateRange.start, dateRange.end);
+        let endPercent = getDatePositionPercent(end, dateRange.start, dateRange.end);
+
+        if (endPercent < startPercent) {
+            [startPercent, endPercent] = [endPercent, startPercent];
+        }
+
+        return { startPercent, widthPercent: Math.max(0.5, endPercent - startPercent) };
     };
 
     // Timeline width - use centralized function for consistency with GanttTimeline
