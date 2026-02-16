@@ -214,15 +214,35 @@ class AzureDevOpsService {
     public async getIterationDateMap(): Promise<Record<string, { start: Date | null; end: Date | null }>> {
         await this.initialize();
 
-        if (!this.organization || !this.projectName) {
+        if (!this.projectName) {
             return {};
         }
 
         try {
-            const url = `https://dev.azure.com/${this.organization}/${encodeURIComponent(this.projectName)}/_apis/wit/classificationnodes/iterations?$depth=10&api-version=7.0`;
-            const root = await this.makeApiRequest<IClassificationNode>(url);
+            const projectScopedUrl = this.baseUrl
+                ? `${this.baseUrl}/wit/classificationnodes/iterations?$depth=10&api-version=7.0`
+                : '';
+            const nameScopedUrl = this.organization
+                ? `https://dev.azure.com/${this.organization}/${encodeURIComponent(this.projectName)}/_apis/wit/classificationnodes/iterations?$depth=10&api-version=7.0`
+                : '';
+            const url = projectScopedUrl || nameScopedUrl;
+
+            if (!url) {
+                return {};
+            }
+
+            let root: IClassificationNode;
+            try {
+                root = await this.makeApiRequest<IClassificationNode>(url);
+            } catch (primaryError) {
+                if (!nameScopedUrl || url === nameScopedUrl) {
+                    throw primaryError;
+                }
+                root = await this.makeApiRequest<IClassificationNode>(nameScopedUrl);
+            }
+
             const result: Record<string, { start: Date | null; end: Date | null }> = {};
-            const normalizedProjectPrefix = `${this.projectName.toLowerCase()}\\`;
+            const normalizedProjectName = this.normalizeIterationPath(this.projectName);
 
             const visit = (node: IClassificationNode) => {
                 const normalizedPath = this.normalizeIterationPath(node.path);
@@ -230,14 +250,7 @@ class AzureDevOpsService {
                 const end = this.parseDate(node.attributes?.finishDate);
 
                 if (normalizedPath && (start || end)) {
-                    result[normalizedPath] = { start, end };
-
-                    if (normalizedPath.startsWith(normalizedProjectPrefix)) {
-                        const withoutProject = normalizedPath.slice(normalizedProjectPrefix.length);
-                        if (withoutProject) {
-                            result[withoutProject] = { start, end };
-                        }
-                    }
+                    this.indexIterationAliases(result, normalizedPath, normalizedProjectName, start, end);
                 }
 
                 for (const child of node.children || []) {
@@ -497,6 +510,44 @@ class AzureDevOpsService {
             .replace(/^\\+/, '')
             .trim()
             .toLowerCase();
+    }
+
+    private indexIterationAliases(
+        map: Record<string, { start: Date | null; end: Date | null }>,
+        normalizedPath: string,
+        normalizedProjectName: string,
+        start: Date | null,
+        end: Date | null
+    ): void {
+        const value = { start, end };
+        const aliases = new Set<string>();
+        const projectPrefix = normalizedProjectName ? `${normalizedProjectName}\\` : '';
+
+        const addAlias = (path: string) => {
+            if (path) aliases.add(path);
+        };
+
+        const removeIterationSegment = (path: string): string => {
+            const segments = path.split('\\');
+            const idx = segments.indexOf('iteration');
+            if (idx >= 0) {
+                segments.splice(idx, 1);
+            }
+            return segments.join('\\');
+        };
+
+        addAlias(normalizedPath);
+        addAlias(removeIterationSegment(normalizedPath));
+
+        if (projectPrefix && normalizedPath.startsWith(projectPrefix)) {
+            const withoutProject = normalizedPath.slice(projectPrefix.length);
+            addAlias(withoutProject);
+            addAlias(removeIterationSegment(withoutProject));
+        }
+
+        for (const alias of aliases) {
+            map[alias] = value;
+        }
     }
 }
 

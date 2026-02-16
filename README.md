@@ -164,7 +164,11 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.33 (Latest)
+### v1.2.34 (Latest)
+- Fixed iteration start-date matching for sprint paths by indexing multiple Azure iteration path variants (with/without `Iteration` segment and project prefix).
+- Added safer project-scoped iteration API lookup fallback so sprint dates resolve more reliably across org/project URL formats.
+
+### v1.2.33
 - Fixed start-date resolution so each work item follows: Start Date -> Iteration Start Date -> Parent-chain Start Date -> Created Date.
 - Added iteration metadata lookup from Azure DevOps iterations so sprint start dates are used when item start date is blank.
 - Enhanced Gantt hover details with owner, iteration path, effort, remaining, completed, and effective start/end dates.
