@@ -498,6 +498,21 @@
     overflow: hidden;
 }
 
+.gantt-blocked-indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1f2937;
+    background: #f6ad55;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
 .gantt-expand-btn {
     width: 20px;
     height: 20px;
@@ -570,6 +585,30 @@
     text-overflow: ellipsis;
     font-size: 13px;
     flex: 1;
+}
+
+.gantt-assignee-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid var(--gantt-border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gantt-header-bg);
+    color: var(--gantt-text-muted);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.gantt-assignee-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 /* Clickable title link */

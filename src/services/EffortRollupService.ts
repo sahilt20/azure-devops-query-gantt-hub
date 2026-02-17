@@ -53,6 +53,16 @@ class EffortRollupService {
             this.calculateNodeRollup(child);
         }
 
+        // Removed items must not contribute effort/remaining anywhere in rollup totals.
+        if (this.isRemovedState(node.state)) {
+            node.plannedHours = 0;
+            node.rollupEffort = 0;
+            node.rollupRemainingWork = 0;
+            node.rollupCompletedWork = 0;
+            node.percentComplete = 0;
+            return;
+        }
+
         // Set planned hours from originalEstimate for clarity
         node.plannedHours = node.originalEstimate || 0;
 
@@ -188,17 +198,18 @@ class EffortRollupService {
      * Calculate weighted percent complete based on effort
      */
     private calculateWeightedPercent(nodes: IWorkItemNode[]): number {
-        const totalEffort = nodes.reduce((sum, n) => sum + n.rollupEffort, 0);
+        const activeNodes = nodes.filter(n => !this.isRemovedState(n.state));
+        const totalEffort = activeNodes.reduce((sum, n) => sum + n.rollupEffort, 0);
 
         if (totalEffort === 0) {
             // If no effort, use simple average
-            if (nodes.length === 0) return 0;
-            const totalPercent = nodes.reduce((sum, n) => sum + n.percentComplete, 0);
-            return Math.round(totalPercent / nodes.length);
+            if (activeNodes.length === 0) return 0;
+            const totalPercent = activeNodes.reduce((sum, n) => sum + n.percentComplete, 0);
+            return Math.round(totalPercent / activeNodes.length);
         }
 
         // Weighted average based on effort
-        const weightedSum = nodes.reduce((sum, n) => sum + (n.percentComplete * n.rollupEffort), 0);
+        const weightedSum = activeNodes.reduce((sum, n) => sum + (n.percentComplete * n.rollupEffort), 0);
         return Math.round(weightedSum / totalEffort);
     }
 
@@ -246,6 +257,14 @@ class EffortRollupService {
      */
     public isRemovedState(state: string): boolean {
         return state.toLowerCase().includes('removed');
+    }
+
+    public isBlockedState(state: string): boolean {
+        const normalized = state.toLowerCase();
+        return normalized.includes('block')
+            || normalized.includes('impediment')
+            || normalized.includes('on hold')
+            || normalized.includes('waiting');
     }
 
     /**

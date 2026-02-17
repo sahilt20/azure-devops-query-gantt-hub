@@ -164,7 +164,14 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.34 (Latest)
+### v1.2.35 (Latest)
+- Added assignee profile avatar chip after work item title in the Gantt table (with initials fallback when photo is unavailable).
+- Added a blocked-state visual indicator before the work item title for quick risk recognition.
+- Updated rollup logic so Removed-state items are excluded from effort/remaining/completed totals.
+- Expanded Settings documentation with more comprehensive logic notes and concrete worked examples.
+- Enforced alphabetical ordering for field dropdowns and Key Terms in Settings.
+
+### v1.2.34
 - Fixed iteration start-date matching for sprint paths by indexing multiple Azure iteration path variants (with/without `Iteration` segment and project prefix).
 - Added safer project-scoped iteration API lookup fallback so sprint dates resolve more reliably across org/project URL formats.
 

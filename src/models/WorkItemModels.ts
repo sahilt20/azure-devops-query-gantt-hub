@@ -12,6 +12,7 @@ export interface IWorkItemNode {
     workItemType: WorkItemType;
     state: string;
     assignedTo: string;
+    assignedToImageUrl: string | null;
 
     // Effort fields
     effort: number;                 // Story Points / Effort (for PBI)
@@ -164,6 +165,7 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         workItemType: 'Unknown',
         state: '',
         assignedTo: '',
+        assignedToImageUrl: null,
         effort: 0,
         originalEstimate: 0,
         remainingWork: 0,

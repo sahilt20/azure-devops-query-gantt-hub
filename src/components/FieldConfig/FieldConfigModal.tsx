@@ -3,7 +3,7 @@
  * Allows users to configure which fields to use for effort calculations
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { fieldConfigService, IFieldConfig, IWorkItemField } from '../../services/FieldConfigService';
 import './FieldConfigModal.css';
@@ -18,6 +18,10 @@ export const FieldConfigModal: React.FC<IFieldConfigModalProps> = ({ isOpen, onC
     const [fields, setFields] = useState<IWorkItemField[]>([]);
     const [loading, setLoading] = useState(true);
     const [config, setConfig] = useState<IFieldConfig>(fieldConfigService.getConfig());
+    const sortedFields = useMemo(
+        () => [...fields].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        [fields]
+    );
 
     useEffect(() => {
         if (isOpen) {
@@ -85,7 +89,7 @@ export const FieldConfigModal: React.FC<IFieldConfigModalProps> = ({ isOpen, onC
                                     value={config.effortField}
                                     onChange={e => handleFieldChange('effortField', e.target.value)}
                                 >
-                                    {fields.map(field => (
+                                    {sortedFields.map(field => (
                                         <option key={field.referenceName} value={field.referenceName}>
                                             {field.name}
                                         </option>
@@ -103,7 +107,7 @@ export const FieldConfigModal: React.FC<IFieldConfigModalProps> = ({ isOpen, onC
                                     value={config.remainingField}
                                     onChange={e => handleFieldChange('remainingField', e.target.value)}
                                 >
-                                    {fields.map(field => (
+                                    {sortedFields.map(field => (
                                         <option key={field.referenceName} value={field.referenceName}>
                                             {field.name}
                                         </option>

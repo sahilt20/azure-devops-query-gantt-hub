@@ -41,7 +41,9 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     const isCustom = isCustomType(workItem.workItemType);
     const customColor = isCustom ? getCustomTypeColor(workItem.workItemType) : undefined;
     const isRemoved = effortRollupService.isRemovedState(workItem.state);
+    const isBlocked = effortRollupService.isBlockedState(workItem.state);
     const tooltipText = buildWorkItemTooltip(workItem);
+    const assigneeInitials = getInitials(workItem.assignedTo);
 
 
 
@@ -94,6 +96,16 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                     {typeAbbr}
                 </span>
 
+                {isBlocked && (
+                    <span
+                        className="gantt-blocked-indicator"
+                        title="Blocked item"
+                        aria-label="Blocked item"
+                    >
+                        !
+                    </span>
+                )}
+
                 <a
                     className="gantt-item-title gantt-item-link"
                     href={workItemUrl}
@@ -104,6 +116,14 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                 >
                     {workItem.title}
                 </a>
+
+                <span className="gantt-assignee-avatar" title={workItem.assignedTo || 'Unassigned'}>
+                    {workItem.assignedToImageUrl ? (
+                        <img src={workItem.assignedToImageUrl} alt={workItem.assignedTo || 'Assignee'} />
+                    ) : (
+                        <span>{assigneeInitials}</span>
+                    )}
+                </span>
             </div>
 
             {/* Effort (rollup) */}
@@ -125,3 +145,14 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
 };
 
 export default GanttRow;
+
+function getInitials(name: string): string {
+    const normalized = (name || '').trim();
+    if (!normalized || normalized.toLowerCase() === 'unassigned') return '?';
+
+    const clean = normalized.includes('<') ? normalized.split('<')[0].trim() : normalized;
+    const parts = clean.split(' ').filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}

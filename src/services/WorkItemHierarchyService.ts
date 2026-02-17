@@ -58,6 +58,7 @@ class WorkItemHierarchyService {
             workItemType,
             state: fields['System.State'] || '',
             assignedTo: this.getAssignedTo(fields['System.AssignedTo']),
+            assignedToImageUrl: this.getAssignedToImageUrl(fields['System.AssignedTo']),
             effort: this.parseNumber(fields['Microsoft.VSTS.Scheduling.Effort']),
             originalEstimate,
             plannedHours: originalEstimate, // Alias for clarity
@@ -614,6 +615,20 @@ class WorkItemHierarchyService {
             return (obj['displayName'] as string) || (obj['uniqueName'] as string) || 'Unassigned';
         }
         return 'Unassigned';
+    }
+
+    private getAssignedToImageUrl(assignedTo: unknown): string | null {
+        if (!assignedTo || typeof assignedTo !== 'object') return null;
+        const obj = assignedTo as Record<string, unknown>;
+        const imageUrl = obj['imageUrl'];
+        if (typeof imageUrl === 'string' && imageUrl.trim().length > 0) {
+            return imageUrl;
+        }
+
+        const links = obj['_links'] as Record<string, unknown> | undefined;
+        const avatar = links?.['avatar'] as Record<string, unknown> | undefined;
+        const href = avatar?.['href'];
+        return typeof href === 'string' && href.trim().length > 0 ? href : null;
     }
 
     /**

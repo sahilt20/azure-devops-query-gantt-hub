@@ -3,7 +3,7 @@
  * Azure DevOps-style side panel with field configuration and documentation
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { azureDevOpsService } from '../../services/AzureDevOpsService';
 import { fieldConfigService, IFieldConfig, IWorkItemField } from '../../services/FieldConfigService';
 import './SettingsPanel.css';
@@ -24,6 +24,72 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
     const [expandedSections, setExpandedSections] = useState<Set<SectionId>>(new Set(['fields']));
 
     const hasChanges = JSON.stringify(config) !== JSON.stringify(initialConfig);
+    const sortedFields = useMemo(
+        () => [...fields].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        [fields]
+    );
+    const glossaryTerms = useMemo(() => ([
+        {
+            term: 'Assignment Coverage',
+            description: 'Percentage of open tasks with a named owner. Example: 18 assigned out of 20 open tasks = 90%.'
+        },
+        {
+            term: 'Completed Work',
+            description: 'Hours already delivered for a work item. For tasks this comes from Completed Work; for parents it is rolled up from children.'
+        },
+        {
+            term: 'Created Date',
+            description: 'The date a work item was created. It is the final fallback start date when Start, Iteration Start, and parent Start are unavailable.'
+        },
+        {
+            term: 'Delivery Confidence',
+            description: 'Composite score based on completion, health, estimate coverage, assignment coverage, and balance. Higher is better for delivery risk.'
+        },
+        {
+            term: 'Done %',
+            description: 'Progress percentage. Formula: 100 - (Remaining / Effort x 100). Example: Effort=40h, Remaining=10h => 75% done.'
+        },
+        {
+            term: 'Effort (Planned Hours)',
+            description: 'Estimated total hours to complete scope. Tasks usually use Original Estimate; parents use rollup from child items.'
+        },
+        {
+            term: 'Iteration Path',
+            description: 'Sprint path assigned to an item. If item Start Date is empty, the iteration start date is used before parent inheritance.'
+        },
+        {
+            term: 'Load Balance',
+            description: 'How evenly remaining work is distributed across owners. Lower balance means concentration risk on a small number of owners.'
+        },
+        {
+            term: 'Overrun',
+            description: 'When forecast effort exceeds estimate. Forecast is Completed + Remaining. Example: estimate=16h, forecast=22h => 6h overrun.'
+        },
+        {
+            term: 'Remaining Work',
+            description: 'Hours left to complete a work item. This drives risk visibility and percent-complete calculations.'
+        },
+        {
+            term: 'Removed State',
+            description: 'Items in Removed state are visually muted and excluded from effort/remaining rollup totals to avoid false delivery load.'
+        },
+        {
+            term: 'Rollup',
+            description: 'Aggregation of child effort/remaining/completed into parent items (Task -> PBI/Bug -> Feature -> Epic).'
+        },
+        {
+            term: 'Start Date Resolution',
+            description: 'Order is fixed: Item Start Date -> Iteration Start Date -> Parent-chain Start Date -> Created Date.'
+        },
+        {
+            term: 'Valid Dates',
+            description: 'Indicates whether dates are explicitly available from fields. Even when explicit dates are missing, fallback logic still resolves timeline placement.'
+        },
+        {
+            term: 'Working Day',
+            description: 'Duration calculations use 7 working hours per day and skip weekends for working-hour based scheduling.'
+        }
+    ]).sort((a, b) => a.term.localeCompare(b.term, undefined, { sensitivity: 'base' })), []);
 
     useEffect(() => {
         if (isOpen) {
@@ -122,7 +188,7 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                                 value={config.effortField}
                                                 onChange={e => handleFieldChange('effortField', e.target.value)}
                                             >
-                                                {fields.map(field => (
+                                                {sortedFields.map(field => (
                                                     <option key={field.referenceName} value={field.referenceName}>
                                                         {field.name}
                                                     </option>
@@ -140,7 +206,7 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                                 value={config.remainingField}
                                                 onChange={e => handleFieldChange('remainingField', e.target.value)}
                                             >
-                                                {fields.map(field => (
+                                                {sortedFields.map(field => (
                                                     <option key={field.referenceName} value={field.referenceName}>
                                                         {field.name}
                                                     </option>
@@ -181,18 +247,9 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                         {expandedSections.has('how-it-works') && (
                             <div className="settings-section-body">
                                 <div className="settings-doc">
-                                    <h4>Done % Calculation</h4>
-                                    <p>
-                                        Progress percentage is automatically calculated using the formula:
-                                        <code>Done % = 100 - (Remaining Work ÷ Total Effort × 100)</code>
-                                    </p>
-                                    <p>
-                                        For work items without effort values, the percentage is calculated based on child work items.
-                                    </p>
-
                                     <h4>Effort Rollup</h4>
                                     <p>
-                                        Effort values automatically roll up through the work item hierarchy:
+                                        Effort and remaining values roll up bottom-up through the hierarchy:
                                     </p>
                                     <ul>
                                         <li><strong>Tasks:</strong> Use their own Original Estimate (Planned Hours)</li>
@@ -201,12 +258,24 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                         <li><strong>Epics:</strong> Sum of all child Feature hours</li>
                                     </ul>
                                     <p>
-                                        This ensures parent work items always reflect the total effort of their children.
+                                        Removed items are excluded from rollup totals so they do not inflate overall effort or remaining work.
+                                    </p>
+                                    <p>
+                                        Example: If Task A = 8h and Task B = 12h under one PBI, that PBI effort becomes 20h.
+                                    </p>
+
+                                    <h4>Done % Calculation</h4>
+                                    <p>
+                                        Progress percentage is automatically calculated using:
+                                        <code>Done % = 100 - (Remaining Work ÷ Total Effort × 100)</code>
+                                    </p>
+                                    <p>
+                                        Example: Effort 40h and Remaining 10h results in 75% Done. If effort is zero, the system derives progress from children or state.
                                     </p>
 
                                     <h4>Date Range Calculation</h4>
                                     <p>
-                                        The Gantt chart calculates start and end dates using different logic per work item type:
+                                        Start and end dates are resolved using deterministic rules per work item type.
                                     </p>
 
                                     <h5>Tasks</h5>
@@ -233,18 +302,30 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                                         <li>Falls back to work item's Created Date</li>
                                     </ul>
 
-                                    <h4>Start Date Inheritance</h4>
+                                    <h4>Start Date Resolution</h4>
                                     <p>
-                                        <strong>Important:</strong> Start date resolution always follows this order:
+                                        Start date resolution always follows this strict order:
                                         work item Start Date → Iteration Start Date → parent-chain Start Date → work item Created Date.
                                     </p>
                                     <p>
-                                        For example: If a Task has no Start Date, it first checks the assigned Iteration start.
-                                        If that is unavailable, it checks parent PBI, then Feature, then Epic start dates.
-                                        If no ancestor has a Start Date, the task Created Date is used.
+                                        Example chain: Task (no Start Date) in Sprint 12 (has start) uses Sprint 12 start. If Sprint 12 has no dates, it checks PBI, then Feature, then Epic Start Date. If none exist, it uses the task Created Date.
                                     </p>
                                     <p>
                                         This ensures every work item has a start date and can always be rendered on the Gantt timeline.
+                                    </p>
+
+                                    <h4>Worked Examples</h4>
+                                    <p>
+                                        <strong>Example 1 (Task):</strong> Start Date empty, Iteration start = 2026-02-01, Planned = 14h.
+                                        Result: Start = 2026-02-01, End calculated by working hours.
+                                    </p>
+                                    <p>
+                                        <strong>Example 2 (PBI):</strong> Start empty, Iteration empty, parent Feature Start = 2026-03-10.
+                                        Result: Start inherits 2026-03-10; end uses completion date or child-derived duration.
+                                    </p>
+                                    <p>
+                                        <strong>Example 3 (Rollup):</strong> 3 tasks with remaining 5h, 3h, and 0h under one PBI.
+                                        Result: PBI Remaining = 8h; parent Feature and Epic remaining values include this 8h.
                                     </p>
 
                                     <h4>Timeline Scaling</h4>
@@ -279,77 +360,12 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
                             <div className="settings-section-body">
                                 <div className="settings-doc">
                                     <dl className="settings-glossary">
-                                        <dt>Original Estimate / Planned Hours</dt>
-                                        <dd>
-                                            The initial estimate of how many hours a task will take to complete.
-                                            Also called "Effort" for Product Backlog Items.
-                                        </dd>
-
-                                        <dt>Remaining Work</dt>
-                                        <dd>
-                                            The number of hours still needed to complete a work item.
-                                            This value decreases as work progresses.
-                                        </dd>
-
-                                        <dt>Completed Work</dt>
-                                        <dd>
-                                            The number of hours already spent on a work item.
-                                            Calculated as: Original Estimate - Remaining Work.
-                                        </dd>
-
-                                        <dt>Done %</dt>
-                                        <dd>
-                                            The percentage of work completed. Auto-calculated using the formula:
-                                            100 - (Remaining ÷ Effort × 100).
-                                        </dd>
-
-                                        <dt>Rollup</dt>
-                                        <dd>
-                                            The process of summing child work item values up to parent work items.
-                                            For example, a Feature's rollup effort is the sum of all its PBI efforts.
-                                        </dd>
-
-                                        <dt>Start Date</dt>
-                                        <dd>
-                                            The date when work on an item is scheduled to begin.
-                                            Can be explicit or inherited from parent work items.
-                                        </dd>
-
-                                        <dt>Target Date</dt>
-                                        <dd>
-                                            The date when work on an item is scheduled to complete.
-                                            Used primarily for Features and Epics.
-                                        </dd>
-
-                                        <dt>Dev/QA Completion Date</dt>
-                                        <dd>
-                                            Custom fields indicating when development or QA testing is expected to finish.
-                                            Used to calculate end dates for PBIs and Bugs.
-                                        </dd>
-
-                                        <dt>Created Date</dt>
-                                        <dd>
-                                            The date when a work item was created in Azure DevOps.
-                                            Used as the final fallback if no other start date is available.
-                                        </dd>
-
-                                        <dt>Working Day</dt>
-                                        <dd>
-                                            Defined as 7 hours for duration calculations.
-                                            Weekends are excluded when calculating working hours.
-                                        </dd>
-
-                                        <dt>Iteration Path</dt>
-                                        <dd>
-                                            The sprint or iteration a work item is assigned to.
-                                            Can provide start/end dates if explicit dates aren't set.
-                                        </dd>
-
-                                        <dt>Valid Dates</dt>
-                                        <dd>
-                                            Indicates whether a work item uses explicit timeline dates.
-                                            If explicit dates are missing, fallback logic still resolves timeline dates.
-                                        </dd>
+                                        {glossaryTerms.map(item => (
+                                            <React.Fragment key={item.term}>
+                                                <dt>{item.term}</dt>
+                                                <dd>{item.description}</dd>
+                                            </React.Fragment>
+                                        ))}
                                     </dl>
                                 </div>
                             </div>
