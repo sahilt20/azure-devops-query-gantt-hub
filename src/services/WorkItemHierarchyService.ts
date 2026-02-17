@@ -654,22 +654,56 @@ class WorkItemHierarchyService {
      * points to fields not present on Task work items.
      */
     private getTaskPlannedHours(fields: Record<string, unknown>, configuredEffortField: string): number {
-        const candidates: unknown[] = [
-            fields['Microsoft.VSTS.Scheduling.OriginalEstimate'],
-            fields['Custom.PlannedHours'],
-            fields['Custom.PlannedHour'],
-            fields['Custom.PlannedEstimate'],
-            fields[configuredEffortField],
-            fields['Microsoft.VSTS.Scheduling.Effort']
+        const orderedFieldNames = [
+            configuredEffortField,
+            'Custom.PlannedHours',
+            'Custom.PlannedHour',
+            'Custom.PlannedEstimate',
+            'Custom.PlannedHrs',
+            'Custom.PlannedWork',
+            'Microsoft.VSTS.Scheduling.OriginalEstimate',
+            'Microsoft.VSTS.Scheduling.Effort'
         ];
 
-        for (const candidate of candidates) {
-            if (candidate !== undefined && candidate !== null && `${candidate}`.trim() !== '') {
-                return this.parseNumber(candidate);
+        let firstNumeric: number | null = null;
+
+        for (const fieldName of orderedFieldNames) {
+            if (!fieldName) continue;
+            const candidate = fields[fieldName];
+            if (candidate === undefined || candidate === null || `${candidate}`.trim() === '') {
+                continue;
+            }
+
+            const parsed = this.parseNumber(candidate);
+            if (firstNumeric === null) {
+                firstNumeric = parsed;
+            }
+
+            // Prefer the first positive planned-hours value.
+            // This avoids stopping at 0 when another planned-hours field is populated.
+            if (parsed > 0) {
+                return parsed;
             }
         }
 
-        return 0;
+        // Last fallback: scan all task fields for planned-hour like names.
+        // This helps when projects use custom references not mapped in settings.
+        for (const [fieldName, candidate] of Object.entries(fields)) {
+            const normalized = fieldName.toLowerCase();
+            if (!normalized.includes('planned')) continue;
+            if (!normalized.includes('hour') && !normalized.includes('estimate')) continue;
+            if (candidate === undefined || candidate === null || `${candidate}`.trim() === '') continue;
+
+            const parsed = this.parseNumber(candidate);
+            if (firstNumeric === null) {
+                firstNumeric = parsed;
+            }
+            if (parsed > 0) {
+                return parsed;
+            }
+        }
+
+        return firstNumeric ?? 0;
     }
 
     private normalizeIterationPath(path: string | undefined): string {

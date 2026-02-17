@@ -15,7 +15,7 @@ import { IQueryInfo } from '../models/WorkItemModels';
 /**
  * Fields to fetch from work items
  */
-const WORK_ITEM_FIELDS = [
+const BASE_WORK_ITEM_FIELDS = [
     'System.Id',
     'System.Title',
     'System.WorkItemType',
@@ -401,7 +401,7 @@ class AzureDevOpsService {
 
                 const body = {
                     ids: batch,
-                    fields: WORK_ITEM_FIELDS
+                    fields: this.getRequestedWorkItemFields()
                 };
 
                 const result = await this.makeApiRequest<{ value: WorkItem[] }>(url, 'POST', body);
@@ -501,6 +501,40 @@ class AzureDevOpsService {
         if (!value) return null;
         const parsed = new Date(value);
         return isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    /**
+     * Build work item field list for batch calls.
+     * Includes user-configured effort/remaining fields and common task planned-hour custom fields.
+     */
+    private getRequestedWorkItemFields(): string[] {
+        const fields = new Set<string>(BASE_WORK_ITEM_FIELDS);
+
+        try {
+            const stored = localStorage.getItem('gantt-field-config');
+            if (stored) {
+                const config = JSON.parse(stored) as { effortField?: string; remainingField?: string };
+                if (config.effortField && config.effortField !== 'calculated') {
+                    fields.add(config.effortField);
+                }
+                if (config.remainingField && config.remainingField !== 'calculated') {
+                    fields.add(config.remainingField);
+                }
+            }
+        } catch (error) {
+            console.warn('[AzureDevOpsService] Failed to read field config for batch request:', error);
+        }
+
+        // Common custom task planned-hour fields used in several process templates.
+        fields.add('Custom.PlannedHours');
+        fields.add('Custom.PlannedHour');
+        fields.add('Custom.PlannedEstimate');
+        fields.add('Custom.PlannedHrs');
+        fields.add('Custom.PlannedWork');
+        fields.add('Microsoft.VSTS.Scheduling.PlannedWork');
+        fields.add('Microsoft.VSTS.Scheduling.PlannedHours');
+
+        return Array.from(fields);
     }
 
     private normalizeIterationPath(path: string | undefined): string {

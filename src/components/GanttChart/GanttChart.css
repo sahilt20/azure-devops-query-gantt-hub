@@ -623,15 +623,6 @@
     display: block;
 }
 
-/* Screenshot fallback (per-avatar): show initials only if that avatar cannot be exported */
-.gantt-assignee-avatar.screenshot-fallback img {
-    display: none !important;
-}
-
-.gantt-assignee-avatar.screenshot-fallback .gantt-assignee-initials {
-    display: inline-flex !important;
-}
-
 /* Clickable title link */
 .gantt-item-link {
     color: var(--gantt-text);

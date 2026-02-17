@@ -99,6 +99,12 @@ class EffortRollupService {
         node.rollupRemainingWork = node.remainingWork || 0;
         node.rollupCompletedWork = node.completedWork || 0;
 
+        // If planned effort is missing on a completed task but completed work is tracked,
+        // keep rollup effort non-blank to avoid collapsing parent totals.
+        if (node.rollupEffort <= 0 && node.rollupCompletedWork > 0) {
+            node.rollupEffort = node.rollupCompletedWork;
+        }
+
         const isDone = this.isDoneState(node.state.toLowerCase());
         if (isDone) {
             // Completed tasks should not carry remaining effort in table/rollups.

@@ -37,6 +37,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     columnWidths = DEFAULT_WIDTHS
 }) => {
     const [avatarLoadFailed, setAvatarLoadFailed] = React.useState(false);
+    const [avatarRetryCount, setAvatarRetryCount] = React.useState(0);
     const typeClass = getWorkItemTypeClass(workItem.workItemType);
     const typeAbbr = getWorkItemTypeAbbreviation(workItem.workItemType);
     const isCustom = isCustomType(workItem.workItemType);
@@ -45,10 +46,17 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     const isBlocked = effortRollupService.isBlockedState(workItem.state);
     const tooltipText = buildWorkItemTooltip(workItem);
     const assigneeInitials = getInitials(workItem.assignedTo);
-    const hasAvatarImage = !!workItem.assignedToImageUrl && !avatarLoadFailed;
+    const avatarSrc = React.useMemo(() => {
+        if (!workItem.assignedToImageUrl) return null;
+        if (avatarRetryCount === 0) return workItem.assignedToImageUrl;
+        const separator = workItem.assignedToImageUrl.includes('?') ? '&' : '?';
+        return `${workItem.assignedToImageUrl}${separator}retry=${workItem.id}-${avatarRetryCount}`;
+    }, [workItem.assignedToImageUrl, workItem.id, avatarRetryCount]);
+    const hasAvatarImage = !!avatarSrc && !avatarLoadFailed;
 
     React.useEffect(() => {
         setAvatarLoadFailed(false);
+        setAvatarRetryCount(0);
     }, [workItem.assignedToImageUrl, workItem.id]);
 
 
@@ -126,9 +134,16 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                 <span className={`gantt-assignee-avatar ${hasAvatarImage ? 'has-image' : ''}`} title={workItem.assignedTo || 'Unassigned'}>
                     {hasAvatarImage && (
                         <img
-                            src={workItem.assignedToImageUrl!}
+                            src={avatarSrc!}
                             alt={workItem.assignedTo || 'Assignee'}
-                            onError={() => setAvatarLoadFailed(true)}
+                            onLoad={() => setAvatarLoadFailed(false)}
+                            onError={() => {
+                                if (avatarRetryCount < 1) {
+                                    setAvatarRetryCount(avatarRetryCount + 1);
+                                    return;
+                                }
+                                setAvatarLoadFailed(true);
+                            }}
                         />
                     )}
                     <span className="gantt-assignee-initials">{assigneeInitials}</span>

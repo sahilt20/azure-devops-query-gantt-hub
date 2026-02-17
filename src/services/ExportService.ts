@@ -6,12 +6,12 @@
 
 import { IWorkItemNode } from '../models/WorkItemModels';
 import { formatShortDate } from '../utils/DateUtils';
+import * as SDK from 'azure-devops-extension-sdk';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 
 class ExportService {
     private static instance: ExportService;
-    private avatarDataUrlCache = new Map<string, string | null>();
 
     private constructor() { }
 
@@ -185,7 +185,6 @@ class ExportService {
     public async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
         let injectedStyleElement: HTMLStyleElement | null = null;
         let originalInlineStyles: Map<HTMLElement, { background: string; backgroundColor: string }> | null = null;
-        let restoreAvatarState: (() => void) | null = null;
 
         try {
             // Element should be .gantt-chart-content wrapper containing headers + scroll container
@@ -198,6 +197,8 @@ class ExportService {
                 console.warn('Could not find scroll container or content');
                 return;
             }
+
+            await this.inlineAvatarImagesForScreenshot(ganttChartContent);
 
             // Store original styles
             const originalStyles = {
@@ -237,10 +238,6 @@ class ExportService {
             // Scroll to beginning
             scrollContainer.scrollLeft = 0;
             scrollContainer.scrollTop = 0;
-
-            // Prepare avatars for screenshot capture:
-            // keep image where possible, fallback to initials only per-avatar on failure.
-            restoreAvatarState = await this.prepareAvatarsForScreenshot(ganttChartContent);
 
             // Determine background color based on theme
             // FIXED: Theme class is on .query-gantt-hub, not body!
@@ -392,10 +389,6 @@ class ExportService {
         } catch (error) {
             console.error('Failed to capture Gantt screenshot:', error);
         } finally {
-            if (restoreAvatarState) {
-                restoreAvatarState();
-            }
-
             // CRITICAL: Remove injected style element from original DOM
             if (injectedStyleElement && injectedStyleElement.parentNode) {
                 console.log('[ExportService] Removing injected style element...');
@@ -419,79 +412,77 @@ class ExportService {
                     }
                 });
             }
+
         }
     }
 
-    private async prepareAvatarsForScreenshot(container: HTMLElement): Promise<() => void> {
-        const avatars = Array.from(container.querySelectorAll('.gantt-assignee-avatar')) as HTMLElement[];
-        const snapshot: Array<{
-            avatar: HTMLElement;
-            image: HTMLImageElement;
-            originalSrc: string;
-            originalCrossOrigin: string | null;
-            hadFallbackClass: boolean;
-        }> = [];
+    /**
+     * Inline assignee avatar images as data URLs before screenshot capture.
+     * This improves export reliability for authenticated image URLs.
+     */
+    private async inlineAvatarImagesForScreenshot(root: HTMLElement): Promise<void> {
+        const avatarImages = Array.from(root.querySelectorAll('.gantt-assignee-avatar img')) as HTMLImageElement[];
 
-        await Promise.all(avatars.map(async avatar => {
-            const image = avatar.querySelector('img');
-            if (!image) return;
-
-            const originalSrc = image.getAttribute('src') || '';
-            if (!originalSrc) return;
-
-            const originalCrossOrigin = image.getAttribute('crossorigin');
-            const hadFallbackClass = avatar.classList.contains('screenshot-fallback');
-            snapshot.push({ avatar, image, originalSrc, originalCrossOrigin, hadFallbackClass });
-
-            const dataUrl = await this.getAvatarDataUrl(originalSrc);
-            if (dataUrl) {
-                image.setAttribute('crossorigin', 'anonymous');
-                image.src = dataUrl;
-                avatar.classList.remove('screenshot-fallback');
-            } else {
-                avatar.classList.add('screenshot-fallback');
-            }
-        }));
-
-        // Allow browser to paint updated avatar DOM before capture.
-        await new Promise(resolve => setTimeout(resolve, 120));
-
-        return () => {
-            for (const item of snapshot) {
-                if (item.originalCrossOrigin === null) {
-                    item.image.removeAttribute('crossorigin');
-                } else {
-                    item.image.setAttribute('crossorigin', item.originalCrossOrigin);
-                }
-                item.image.src = item.originalSrc;
-                item.avatar.classList.toggle('screenshot-fallback', item.hadFallbackClass);
-            }
-        };
-    }
-
-    private async getAvatarDataUrl(src: string): Promise<string | null> {
-        if (!src) return null;
-        if (src.startsWith('data:')) return src;
-        if (this.avatarDataUrlCache.has(src)) {
-            return this.avatarDataUrlCache.get(src) || null;
+        if (avatarImages.length === 0) {
+            return;
         }
 
+        let token: string | null = null;
         try {
-            const response = await fetch(src, { credentials: 'include' });
+            token = await SDK.getAccessToken();
+        } catch (error) {
+            console.warn('[ExportService] Could not get access token for avatar export:', error);
+        }
+
+        const dataUrlCache = new Map<string, string | null>();
+        for (const image of avatarImages) {
+            const originalSrc = image.getAttribute('src') || '';
+            if (!originalSrc || originalSrc.startsWith('data:')) {
+                continue;
+            }
+
+            let dataUrl = dataUrlCache.get(originalSrc);
+            if (dataUrl === undefined) {
+                dataUrl = await this.fetchAvatarAsDataUrl(originalSrc, token);
+                dataUrlCache.set(originalSrc, dataUrl);
+            }
+
+            if (dataUrl) {
+                image.src = dataUrl;
+            }
+        }
+    }
+
+    private async fetchAvatarAsDataUrl(src: string, token: string | null): Promise<string | null> {
+        const withToken = token
+            ? await this.fetchImageAsDataUrl(src, { Authorization: `Bearer ${token}` })
+            : null;
+        if (withToken) {
+            return withToken;
+        }
+
+        return this.fetchImageAsDataUrl(src);
+    }
+
+    private async fetchImageAsDataUrl(src: string, extraHeaders?: Record<string, string>): Promise<string | null> {
+        try {
+            const response = await fetch(src, {
+                method: 'GET',
+                credentials: 'include',
+                headers: extraHeaders
+            });
             if (!response.ok) {
-                this.avatarDataUrlCache.set(src, null);
                 return null;
             }
+
             const blob = await response.blob();
             if (!blob.type.startsWith('image/')) {
-                this.avatarDataUrlCache.set(src, null);
                 return null;
             }
-            const dataUrl = await this.blobToDataUrl(blob);
-            this.avatarDataUrlCache.set(src, dataUrl);
-            return dataUrl;
-        } catch {
-            this.avatarDataUrlCache.set(src, null);
+
+            return await this.blobToDataUrl(blob);
+        } catch (error) {
+            console.warn('[ExportService] Failed to inline avatar image for screenshot:', error);
             return null;
         }
     }
@@ -499,8 +490,14 @@ class ExportService {
     private blobToDataUrl(blob: Blob): Promise<string> {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result));
-            reader.onerror = () => reject(reader.error);
+            reader.onloadend = () => {
+                if (typeof reader.result === 'string') {
+                    resolve(reader.result);
+                    return;
+                }
+                reject(new Error('Failed to convert blob to data URL'));
+            };
+            reader.onerror = () => reject(reader.error || new Error('Failed to read image blob'));
             reader.readAsDataURL(blob);
         });
     }
