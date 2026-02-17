@@ -353,7 +353,8 @@ class ExportService {
             console.log('[ExportService] Starting html2canvas capture...');
             const canvas = await html2canvas(ganttChartContent, {
                 scale: 2, // High quality
-                useCORS: true,
+                // Keep false to avoid forcing anonymous re-fetch of authenticated avatar URLs.
+                useCORS: false,
                 logging: false,
                 backgroundColor: backgroundColor,
                 width: fullWidth,
@@ -465,6 +466,13 @@ class ExportService {
                 continue;
             }
 
+            // Best effort first: use image already loaded in browser memory.
+            const loadedImageDataUrl = this.getLoadedImageDataUrl(image);
+            if (loadedImageDataUrl) {
+                image.setAttribute('data-export-src', loadedImageDataUrl);
+                continue;
+            }
+
             let dataUrl = dataUrlCache.get(originalSrc);
             if (dataUrl === undefined) {
                 dataUrl = await this.fetchAvatarAsDataUrl(originalSrc, token);
@@ -483,6 +491,28 @@ class ExportService {
                 image.removeAttribute('data-export-src');
             }
         };
+    }
+
+    private getLoadedImageDataUrl(image: HTMLImageElement): string | null {
+        if (!image.complete || image.naturalWidth === 0 || image.naturalHeight === 0) {
+            return null;
+        }
+
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return null;
+            }
+
+            ctx.drawImage(image, 0, 0);
+            return canvas.toDataURL('image/png');
+        } catch {
+            // Canvas conversion fails for tainted/non-readable image sources.
+            return null;
+        }
     }
 
     private async fetchAvatarAsDataUrl(src: string, token: string | null): Promise<string | null> {

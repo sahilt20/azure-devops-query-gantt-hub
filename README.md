@@ -164,7 +164,11 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.41 (Latest)
+### v1.2.42 (Latest)
+- Improved screenshot avatar rendering by using already-loaded avatar image bitmaps first (canvas data URL path) before network fetch fallback.
+- Updated screenshot capture mode to avoid anonymous avatar re-fetch behavior that caused blank profile pictures during export.
+
+### v1.2.41
 - Fixed screenshot avatar regression where clicking screenshot could blank live avatar images and produce blank avatar circles in export.
 - Screenshot export now applies avatar image substitution only in html2canvas cloned DOM and never mutates live avatar `src`.
 - Added clone-time fallback to initials for avatars that cannot be exported as images, preventing blank circles in screenshots.
