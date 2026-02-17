@@ -188,6 +188,7 @@ class ExportService {
         try {
             // Element should be .gantt-chart-content wrapper containing headers + scroll container
             const ganttChartContent = element;
+            ganttChartContent.classList.add('export-screenshot-mode');
             const scrollContainer = ganttChartContent.querySelector('.gantt-scroll-container') as HTMLElement;
             const ganttScrollContent = ganttChartContent.querySelector('.gantt-scroll-content') as HTMLElement;
             const timelineHeaderWrapper = ganttChartContent.querySelector('.gantt-timeline-header-wrapper') as HTMLElement;
@@ -386,6 +387,8 @@ class ExportService {
         } catch (error) {
             console.error('Failed to capture Gantt screenshot:', error);
         } finally {
+            element.classList.remove('export-screenshot-mode');
+
             // CRITICAL: Remove injected style element from original DOM
             if (injectedStyleElement && injectedStyleElement.parentNode) {
                 console.log('[ExportService] Removing injected style element...');

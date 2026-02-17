@@ -164,7 +164,12 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.35 (Latest)
+### v1.2.36 (Latest)
+- Fixed screenshot export avatar rendering: assignee avatars now fall back to initials in export mode to avoid blank circles in PNG output.
+- Fixed rollup behavior for done/completed items so Remaining is forced to `0` while Effort remains planned/estimated.
+- Ensured completed items report `100%` progress consistently with corrected effort/remaining values.
+
+### v1.2.35
 - Added assignee profile avatar chip after work item title in the Gantt table (with initials fallback when photo is unavailable).
 - Added a blocked-state visual indicator before the work item title for quick risk recognition.
 - Updated rollup logic so Removed-state items are excluded from effort/remaining/completed totals.

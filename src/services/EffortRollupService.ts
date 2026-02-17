@@ -99,6 +99,15 @@ class EffortRollupService {
         node.rollupRemainingWork = node.remainingWork || 0;
         node.rollupCompletedWork = node.completedWork || 0;
 
+        const isDone = this.isDoneState(node.state.toLowerCase());
+        if (isDone) {
+            // Completed tasks should not carry remaining effort in table/rollups.
+            node.rollupRemainingWork = 0;
+            node.rollupCompletedWork = Math.max(node.rollupCompletedWork, node.rollupEffort);
+            node.percentComplete = 100;
+            return;
+        }
+
         // Calculate percent complete
         if (node.rollupEffort > 0) {
             node.percentComplete = Math.round(100 - (node.rollupRemainingWork * 100 / node.rollupEffort));
@@ -130,10 +139,11 @@ class EffortRollupService {
             // No child tasks - treat like a leaf item using its own effort/remaining fields
             node.rollupEffort = node.plannedHours || node.originalEstimate || node.effort || 0;
             node.rollupRemainingWork = node.remainingWork || 0;
+            const isDone = this.isDoneState(node.state.toLowerCase());
 
             // If effort exists but no remaining work is explicitly set, infer from state
             if (node.rollupEffort > 0 && node.remainingWork === 0) {
-                if (this.isDoneState(node.state.toLowerCase())) {
+                if (isDone) {
                     node.rollupRemainingWork = 0;
                 } else if (this.isActiveState(node.state.toLowerCase())) {
                     node.rollupRemainingWork = node.rollupEffort * 0.5;
@@ -144,6 +154,13 @@ class EffortRollupService {
             }
 
             node.rollupCompletedWork = node.completedWork || (node.rollupEffort - node.rollupRemainingWork);
+
+            if (isDone) {
+                node.rollupRemainingWork = 0;
+                node.rollupCompletedWork = Math.max(node.rollupCompletedWork, node.rollupEffort);
+                node.percentComplete = 100;
+                return;
+            }
 
             // Calculate percent complete
             if (node.rollupEffort > 0) {

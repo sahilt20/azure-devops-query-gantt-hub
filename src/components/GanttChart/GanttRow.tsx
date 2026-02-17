@@ -36,6 +36,7 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     onToggle,
     columnWidths = DEFAULT_WIDTHS
 }) => {
+    const [avatarLoadFailed, setAvatarLoadFailed] = React.useState(false);
     const typeClass = getWorkItemTypeClass(workItem.workItemType);
     const typeAbbr = getWorkItemTypeAbbreviation(workItem.workItemType);
     const isCustom = isCustomType(workItem.workItemType);
@@ -44,6 +45,11 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     const isBlocked = effortRollupService.isBlockedState(workItem.state);
     const tooltipText = buildWorkItemTooltip(workItem);
     const assigneeInitials = getInitials(workItem.assignedTo);
+    const hasAvatarImage = !!workItem.assignedToImageUrl && !avatarLoadFailed;
+
+    React.useEffect(() => {
+        setAvatarLoadFailed(false);
+    }, [workItem.assignedToImageUrl, workItem.id]);
 
 
 
@@ -117,12 +123,15 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                     {workItem.title}
                 </a>
 
-                <span className="gantt-assignee-avatar" title={workItem.assignedTo || 'Unassigned'}>
-                    {workItem.assignedToImageUrl ? (
-                        <img src={workItem.assignedToImageUrl} alt={workItem.assignedTo || 'Assignee'} />
-                    ) : (
-                        <span>{assigneeInitials}</span>
+                <span className={`gantt-assignee-avatar ${hasAvatarImage ? 'has-image' : ''}`} title={workItem.assignedTo || 'Unassigned'}>
+                    {hasAvatarImage && (
+                        <img
+                            src={workItem.assignedToImageUrl!}
+                            alt={workItem.assignedTo || 'Assignee'}
+                            onError={() => setAvatarLoadFailed(true)}
+                        />
                     )}
+                    <span className="gantt-assignee-initials">{assigneeInitials}</span>
                 </span>
             </div>
 
