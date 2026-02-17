@@ -185,6 +185,7 @@ class ExportService {
     public async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
         let injectedStyleElement: HTMLStyleElement | null = null;
         let originalInlineStyles: Map<HTMLElement, { background: string; backgroundColor: string }> | null = null;
+        let cleanupAvatarExportData: (() => void) | null = null;
 
         try {
             // Element should be .gantt-chart-content wrapper containing headers + scroll container
@@ -198,7 +199,7 @@ class ExportService {
                 return;
             }
 
-            await this.inlineAvatarImagesForScreenshot(ganttChartContent);
+            cleanupAvatarExportData = await this.prepareAvatarExportData(ganttChartContent);
 
             // Store original styles
             const originalStyles = {
@@ -360,7 +361,23 @@ class ExportService {
                 windowWidth: fullWidth + 100,
                 windowHeight: fullHeight + headersHeight + 100,
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                onclone: (doc) => {
+                    const avatars = Array.from(doc.querySelectorAll('.gantt-assignee-avatar')) as HTMLElement[];
+                    for (const avatar of avatars) {
+                        const image = avatar.querySelector('img') as HTMLImageElement | null;
+                        if (!image) continue;
+
+                        const exportSrc = image.getAttribute('data-export-src');
+                        if (exportSrc) {
+                            image.src = exportSrc;
+                            avatar.classList.add('has-image');
+                        } else {
+                            // Ensure screenshot never shows blank circles.
+                            avatar.classList.remove('has-image');
+                        }
+                    }
+                }
             });
 
             // Restore original styles
@@ -413,18 +430,22 @@ class ExportService {
                 });
             }
 
+            if (cleanupAvatarExportData) {
+                cleanupAvatarExportData();
+            }
+
         }
     }
 
     /**
-     * Inline assignee avatar images as data URLs before screenshot capture.
-     * This improves export reliability for authenticated image URLs.
+     * Pre-fetch assignee avatar images as data URLs and attach them to DOM data attributes.
+     * Capture uses these values in the cloned DOM so the live UI is never mutated.
      */
-    private async inlineAvatarImagesForScreenshot(root: HTMLElement): Promise<void> {
+    private async prepareAvatarExportData(root: HTMLElement): Promise<() => void> {
         const avatarImages = Array.from(root.querySelectorAll('.gantt-assignee-avatar img')) as HTMLImageElement[];
 
         if (avatarImages.length === 0) {
-            return;
+            return () => undefined;
         }
 
         let token: string | null = null;
@@ -438,6 +459,9 @@ class ExportService {
         for (const image of avatarImages) {
             const originalSrc = image.getAttribute('src') || '';
             if (!originalSrc || originalSrc.startsWith('data:')) {
+                if (originalSrc.startsWith('data:')) {
+                    image.setAttribute('data-export-src', originalSrc);
+                }
                 continue;
             }
 
@@ -448,9 +472,17 @@ class ExportService {
             }
 
             if (dataUrl) {
-                image.src = dataUrl;
+                image.setAttribute('data-export-src', dataUrl);
+            } else {
+                image.removeAttribute('data-export-src');
             }
         }
+
+        return () => {
+            for (const image of avatarImages) {
+                image.removeAttribute('data-export-src');
+            }
+        };
     }
 
     private async fetchAvatarAsDataUrl(src: string, token: string | null): Promise<string | null> {
