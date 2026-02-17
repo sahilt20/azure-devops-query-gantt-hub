@@ -164,7 +164,11 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.39 (Latest)
+### v1.2.40 (Latest)
+- Release refresh build for the latest query/rollup/screenshot fixes.
+- Packaged and published updated VSIX from current `master`.
+
+### v1.2.39
 - Fixed query execution failure (`TF51535: Cannot find field ...`) by adding resilient work-item batch retry logic.
 - When Azure DevOps rejects an unknown field, the extension now auto-removes that field and retries instead of failing the full query.
 
