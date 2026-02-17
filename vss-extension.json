@@ -1,7 +1,7 @@
 {
     "manifestVersion": 1,
     "id": "query-gantt-hub",
-    "version": "1.2.42",
+    "version": "1.2.43",
     "name": "Query Gantt Chart",
     "description": "Gantt Chart hub for Azure DevOps with robust start-date fallback, iteration-aware planning, rich hover details, effort rollup, and export support for Epic, Feature, PBI, Bug, and Task hierarchies.",
     "publisher": "SahilTanwar",

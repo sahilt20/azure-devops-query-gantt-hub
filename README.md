@@ -164,7 +164,11 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.42 (Latest)
+### v1.2.43 (Latest)
+- Fixed screenshot avatar alignment by forcing centered circular crop styles in the html2canvas cloned DOM.
+- Added explicit clone-time image + initials toggling so exported avatars stay centered and visually consistent.
+
+### v1.2.42
 - Improved screenshot avatar rendering by using already-loaded avatar image bitmaps first (canvas data URL path) before network fetch fallback.
 - Updated screenshot capture mode to avoid anonymous avatar re-fetch behavior that caused blank profile pictures during export.
 

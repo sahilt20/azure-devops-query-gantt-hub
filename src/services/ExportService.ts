@@ -366,16 +366,45 @@ class ExportService {
                 onclone: (doc) => {
                     const avatars = Array.from(doc.querySelectorAll('.gantt-assignee-avatar')) as HTMLElement[];
                     for (const avatar of avatars) {
+                        // Force deterministic avatar centering in screenshot clone.
+                        avatar.style.position = 'relative';
+                        avatar.style.overflow = 'hidden';
+                        avatar.style.borderRadius = '50%';
+                        avatar.style.display = 'inline-flex';
+                        avatar.style.alignItems = 'center';
+                        avatar.style.justifyContent = 'center';
+
                         const image = avatar.querySelector('img') as HTMLImageElement | null;
-                        if (!image) continue;
+                        const initials = avatar.querySelector('.gantt-assignee-initials') as HTMLElement | null;
+                        if (!image) {
+                            if (initials) {
+                                initials.style.display = 'inline-flex';
+                            }
+                            continue;
+                        }
 
                         const exportSrc = image.getAttribute('data-export-src');
                         if (exportSrc) {
                             image.src = exportSrc;
                             avatar.classList.add('has-image');
+                            image.style.position = 'absolute';
+                            image.style.top = '0';
+                            image.style.left = '0';
+                            image.style.width = '100%';
+                            image.style.height = '100%';
+                            image.style.display = 'block';
+                            image.style.objectFit = 'cover';
+                            image.style.objectPosition = 'center center';
+                            image.style.transform = 'translateZ(0)';
+                            if (initials) {
+                                initials.style.display = 'none';
+                            }
                         } else {
                             // Ensure screenshot never shows blank circles.
                             avatar.classList.remove('has-image');
+                            if (initials) {
+                                initials.style.display = 'inline-flex';
+                            }
                         }
                     }
                 }
