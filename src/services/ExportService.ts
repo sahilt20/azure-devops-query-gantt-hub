@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 
 class ExportService {
     private static instance: ExportService;
+    private avatarDataUrlCache = new Map<string, string | null>();
 
     private constructor() { }
 
@@ -184,11 +185,11 @@ class ExportService {
     public async captureAndDownloadScreenshot(element: HTMLElement, filename: string): Promise<void> {
         let injectedStyleElement: HTMLStyleElement | null = null;
         let originalInlineStyles: Map<HTMLElement, { background: string; backgroundColor: string }> | null = null;
+        let restoreAvatarState: (() => void) | null = null;
 
         try {
             // Element should be .gantt-chart-content wrapper containing headers + scroll container
             const ganttChartContent = element;
-            ganttChartContent.classList.add('export-screenshot-mode');
             const scrollContainer = ganttChartContent.querySelector('.gantt-scroll-container') as HTMLElement;
             const ganttScrollContent = ganttChartContent.querySelector('.gantt-scroll-content') as HTMLElement;
             const timelineHeaderWrapper = ganttChartContent.querySelector('.gantt-timeline-header-wrapper') as HTMLElement;
@@ -236,6 +237,10 @@ class ExportService {
             // Scroll to beginning
             scrollContainer.scrollLeft = 0;
             scrollContainer.scrollTop = 0;
+
+            // Prepare avatars for screenshot capture:
+            // keep image where possible, fallback to initials only per-avatar on failure.
+            restoreAvatarState = await this.prepareAvatarsForScreenshot(ganttChartContent);
 
             // Determine background color based on theme
             // FIXED: Theme class is on .query-gantt-hub, not body!
@@ -387,7 +392,9 @@ class ExportService {
         } catch (error) {
             console.error('Failed to capture Gantt screenshot:', error);
         } finally {
-            element.classList.remove('export-screenshot-mode');
+            if (restoreAvatarState) {
+                restoreAvatarState();
+            }
 
             // CRITICAL: Remove injected style element from original DOM
             if (injectedStyleElement && injectedStyleElement.parentNode) {
@@ -413,6 +420,89 @@ class ExportService {
                 });
             }
         }
+    }
+
+    private async prepareAvatarsForScreenshot(container: HTMLElement): Promise<() => void> {
+        const avatars = Array.from(container.querySelectorAll('.gantt-assignee-avatar')) as HTMLElement[];
+        const snapshot: Array<{
+            avatar: HTMLElement;
+            image: HTMLImageElement;
+            originalSrc: string;
+            originalCrossOrigin: string | null;
+            hadFallbackClass: boolean;
+        }> = [];
+
+        await Promise.all(avatars.map(async avatar => {
+            const image = avatar.querySelector('img');
+            if (!image) return;
+
+            const originalSrc = image.getAttribute('src') || '';
+            if (!originalSrc) return;
+
+            const originalCrossOrigin = image.getAttribute('crossorigin');
+            const hadFallbackClass = avatar.classList.contains('screenshot-fallback');
+            snapshot.push({ avatar, image, originalSrc, originalCrossOrigin, hadFallbackClass });
+
+            const dataUrl = await this.getAvatarDataUrl(originalSrc);
+            if (dataUrl) {
+                image.setAttribute('crossorigin', 'anonymous');
+                image.src = dataUrl;
+                avatar.classList.remove('screenshot-fallback');
+            } else {
+                avatar.classList.add('screenshot-fallback');
+            }
+        }));
+
+        // Allow browser to paint updated avatar DOM before capture.
+        await new Promise(resolve => setTimeout(resolve, 120));
+
+        return () => {
+            for (const item of snapshot) {
+                if (item.originalCrossOrigin === null) {
+                    item.image.removeAttribute('crossorigin');
+                } else {
+                    item.image.setAttribute('crossorigin', item.originalCrossOrigin);
+                }
+                item.image.src = item.originalSrc;
+                item.avatar.classList.toggle('screenshot-fallback', item.hadFallbackClass);
+            }
+        };
+    }
+
+    private async getAvatarDataUrl(src: string): Promise<string | null> {
+        if (!src) return null;
+        if (src.startsWith('data:')) return src;
+        if (this.avatarDataUrlCache.has(src)) {
+            return this.avatarDataUrlCache.get(src) || null;
+        }
+
+        try {
+            const response = await fetch(src, { credentials: 'include' });
+            if (!response.ok) {
+                this.avatarDataUrlCache.set(src, null);
+                return null;
+            }
+            const blob = await response.blob();
+            if (!blob.type.startsWith('image/')) {
+                this.avatarDataUrlCache.set(src, null);
+                return null;
+            }
+            const dataUrl = await this.blobToDataUrl(blob);
+            this.avatarDataUrlCache.set(src, dataUrl);
+            return dataUrl;
+        } catch {
+            this.avatarDataUrlCache.set(src, null);
+            return null;
+        }
+    }
+
+    private blobToDataUrl(blob: Blob): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+        });
     }
 
     /**

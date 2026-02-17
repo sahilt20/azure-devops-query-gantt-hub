@@ -48,7 +48,12 @@ class WorkItemHierarchyService {
         const fieldConfig = this.getFieldConfig();
 
         // Read effort/remaining from configured fields
-        const originalEstimate = this.parseNumber(fields[fieldConfig.effortField] || fields['Microsoft.VSTS.Scheduling.OriginalEstimate']);
+        const taskPlannedHours = workItemType === 'Task'
+            ? this.getTaskPlannedHours(fields, fieldConfig.effortField)
+            : 0;
+        const originalEstimate = workItemType === 'Task'
+            ? taskPlannedHours
+            : this.parseNumber(fields[fieldConfig.effortField] || fields['Microsoft.VSTS.Scheduling.OriginalEstimate']);
         const remainingWork = this.parseNumber(fields[fieldConfig.remainingField] || fields['Microsoft.VSTS.Scheduling.RemainingWork']);
         const completedWork = this.parseNumber(fields['Microsoft.VSTS.Scheduling.CompletedWork']);
 
@@ -61,7 +66,7 @@ class WorkItemHierarchyService {
             assignedToImageUrl: this.getAssignedToImageUrl(fields['System.AssignedTo']),
             effort: this.parseNumber(fields['Microsoft.VSTS.Scheduling.Effort']),
             originalEstimate,
-            plannedHours: originalEstimate, // Alias for clarity
+            plannedHours: workItemType === 'Task' ? taskPlannedHours : originalEstimate, // Alias for clarity
             remainingWork,
             completedWork,
             createdDate: parseAzureDate(fields['System.CreatedDate']),
@@ -640,6 +645,30 @@ class WorkItemHierarchyService {
             const parsed = parseFloat(value);
             return isNaN(parsed) ? 0 : parsed;
         }
+        return 0;
+    }
+
+    /**
+     * Resolve task planned hours from task-centric fields first.
+     * This prevents blank effort for completed tasks when project-level effort mapping
+     * points to fields not present on Task work items.
+     */
+    private getTaskPlannedHours(fields: Record<string, unknown>, configuredEffortField: string): number {
+        const candidates: unknown[] = [
+            fields['Microsoft.VSTS.Scheduling.OriginalEstimate'],
+            fields['Custom.PlannedHours'],
+            fields['Custom.PlannedHour'],
+            fields['Custom.PlannedEstimate'],
+            fields[configuredEffortField],
+            fields['Microsoft.VSTS.Scheduling.Effort']
+        ];
+
+        for (const candidate of candidates) {
+            if (candidate !== undefined && candidate !== null && `${candidate}`.trim() !== '') {
+                return this.parseNumber(candidate);
+            }
+        }
+
         return 0;
     }
 

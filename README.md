@@ -164,7 +164,11 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.36 (Latest)
+### v1.2.37 (Latest)
+- Improved screenshot avatar export behavior: keeps profile pictures when capturable and falls back to initials only for specific avatars that fail export rendering.
+- Fixed Task effort sourcing to prioritize task planned-hours fields (Original Estimate/Planned Hours variants) so effort does not appear blank in Gantt rows.
+
+### v1.2.36
 - Fixed screenshot export avatar rendering: assignee avatars now fall back to initials in export mode to avoid blank circles in PNG output.
 - Fixed rollup behavior for done/completed items so Remaining is forced to `0` while Effort remains planned/estimated.
 - Ensured completed items report `100%` progress consistently with corrected effort/remaining values.

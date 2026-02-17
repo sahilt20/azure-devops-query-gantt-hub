@@ -623,12 +623,12 @@
     display: block;
 }
 
-/* Screenshot export mode: force initials for consistent capture */
-.gantt-chart-content.export-screenshot-mode .gantt-assignee-avatar img {
+/* Screenshot fallback (per-avatar): show initials only if that avatar cannot be exported */
+.gantt-assignee-avatar.screenshot-fallback img {
     display: none !important;
 }
 
-.gantt-chart-content.export-screenshot-mode .gantt-assignee-avatar .gantt-assignee-initials {
+.gantt-assignee-avatar.screenshot-fallback .gantt-assignee-initials {
     display: inline-flex !important;
 }
 
