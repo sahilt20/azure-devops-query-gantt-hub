@@ -164,7 +164,11 @@ azure-devops-query-ui-hub/
 
 ## Version History
 
-### v1.2.38 (Latest)
+### v1.2.39 (Latest)
+- Fixed query execution failure (`TF51535: Cannot find field ...`) by adding resilient work-item batch retry logic.
+- When Azure DevOps rejects an unknown field, the extension now auto-removes that field and retries instead of failing the full query.
+
+### v1.2.38
 - Fixed screenshot behavior where avatars switched to initials when capture was triggered; export now preserves profile photos more reliably by inlining avatar images before capture.
 - Fixed Task effort blank values for done/completed tasks by improving planned-hours field resolution (configured effort field + planned-hours variants) and fetch coverage.
 - Improved rollup stability so completed work can backfill missing task effort and prevent parent totals from collapsing.

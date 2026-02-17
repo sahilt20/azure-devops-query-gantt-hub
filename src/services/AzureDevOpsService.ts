@@ -54,6 +54,7 @@ class AzureDevOpsService {
     private initialized = false;
     private initError: string | null = null;
     private initPromise: Promise<void> | null = null;
+    private unsupportedWorkItemFields: Set<string> = new Set();
 
     private constructor() { }
 
@@ -391,6 +392,7 @@ class AzureDevOpsService {
         try {
             console.log(`[AzureDevOpsService] Fetching ${ids.length} work items...`);
             const url = `${this.baseUrl}/wit/workitemsbatch?api-version=7.0`;
+            let requestedFields = this.getRequestedWorkItemFields();
 
             const batchSize = 200;
             const allWorkItems: WorkItem[] = [];
@@ -398,13 +400,36 @@ class AzureDevOpsService {
             for (let i = 0; i < ids.length; i += batchSize) {
                 const batch = ids.slice(i, i + batchSize);
                 console.log(`[AzureDevOpsService] Fetching batch ${Math.floor(i / batchSize) + 1}: ${batch.length} items`);
+                let result: { value: WorkItem[] };
 
-                const body = {
-                    ids: batch,
-                    fields: this.getRequestedWorkItemFields()
-                };
+                // Retry batch when the server rejects unknown fields.
+                // Azure DevOps fails the entire batch if even one field is invalid.
+                while (true) {
+                    try {
+                        const body: { ids: number[]; fields?: string[] } = { ids: batch };
+                        if (requestedFields.length > 0) {
+                            body.fields = requestedFields;
+                        }
+                        result = await this.makeApiRequest<{ value: WorkItem[] }>(url, 'POST', body);
+                        break;
+                    } catch (batchError) {
+                        const missingField = this.extractMissingFieldReference(batchError);
+                        if (!missingField) {
+                            throw batchError;
+                        }
 
-                const result = await this.makeApiRequest<{ value: WorkItem[] }>(url, 'POST', body);
+                        const missingFieldLower = missingField.toLowerCase();
+                        const filteredFields = requestedFields.filter(field => field.toLowerCase() !== missingFieldLower);
+
+                        if (filteredFields.length === requestedFields.length) {
+                            throw batchError;
+                        }
+
+                        this.unsupportedWorkItemFields.add(missingField);
+                        requestedFields = filteredFields;
+                        console.warn(`[AzureDevOpsService] Dropping unsupported field and retrying batch: ${missingField}`);
+                    }
+                }
 
                 if (result.value) {
                     const validItems = result.value.filter(wi => wi !== null);
@@ -534,7 +559,30 @@ class AzureDevOpsService {
         fields.add('Microsoft.VSTS.Scheduling.PlannedWork');
         fields.add('Microsoft.VSTS.Scheduling.PlannedHours');
 
+        // Drop fields already proven unsupported for this org/project.
+        for (const unsupportedField of this.unsupportedWorkItemFields) {
+            fields.delete(unsupportedField);
+        }
+
         return Array.from(fields);
+    }
+
+    private extractMissingFieldReference(error: unknown): string | null {
+        const message = error instanceof Error ? error.message : String(error);
+        const patterns = [
+            /Cannot find field\s+([A-Za-z0-9_.]+)\./i,
+            /Cannot find field\s+"([A-Za-z0-9_.]+)"/i,
+            /Cannot find field\s+'([A-Za-z0-9_.]+)'/i
+        ];
+
+        for (const pattern of patterns) {
+            const match = message.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+
+        return null;
     }
 
     private normalizeIterationPath(path: string | undefined): string {
