@@ -80,7 +80,8 @@ class WorkItemHierarchyService {
             parentId: this.parseNumber(fields['System.Parent']) || null,
             level: WorkItemTypeLevel[workItemType],
             isExpanded: true,
-            hasValidDates: false // Will be set during date calculation
+            hasValidDates: false, // Will be set during date calculation
+            blocked: (fields['Microsoft.VSTS.CMMI.Blocked'] as string)?.toLowerCase() === 'yes'
         });
     }
 

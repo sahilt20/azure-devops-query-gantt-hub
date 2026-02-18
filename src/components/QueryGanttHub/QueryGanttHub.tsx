@@ -18,6 +18,40 @@ import './QueryGanttHub.css';
 const isDevelopment = typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+/**
+ * Convert a raw API error into a user-friendly message.
+ * Technical error strings (stack traces, HTTP codes, etc.) are replaced
+ * with actionable guidance wherever the underlying cause is recognisable.
+ */
+function toUserFriendlyError(rawError: string): string {
+    const lower = rawError.toLowerCase();
+
+    if (lower.includes('20000') || (lower.includes('exceeds') && lower.includes('limit'))
+        || lower.includes('too many work items') || lower.includes('tf51031')) {
+        return 'Your query returned too many work items (Azure DevOps limit is 20,000 per query). '
+            + 'Please refine your query to return fewer results — for example by filtering on a specific '
+            + 'Iteration Path, Area Path, date range, or work item type.';
+    }
+
+    if (lower.includes('unauthorized') || lower.includes('401') || lower.includes('forbidden') || lower.includes('403')) {
+        return 'Access denied. You may not have permission to run this query. '
+            + 'Please check your Azure DevOps permissions or contact your project administrator.';
+    }
+
+    if (lower.includes('not found') || lower.includes('404')) {
+        return 'The selected query could not be found. It may have been deleted, renamed, or moved. '
+            + 'Please refresh the page or choose a different query.';
+    }
+
+    if (lower.includes('network') || lower.includes('failed to fetch') || lower.includes('err_network')) {
+        return 'Network error: unable to reach Azure DevOps. Please check your internet connection and try again.';
+    }
+
+    // Fall back to the raw message, but strip any leading "Failed to execute query: " prefix
+    // so the same message isn't duplicated.
+    return rawError.replace(/^failed to execute query:\s*/i, '');
+}
+
 export const QueryGanttHub: React.FC = () => {
     const [queries, setQueries] = React.useState<IQueryInfo[]>([]);
     const [selectedQueryId, setSelectedQueryId] = React.useState<string>('');
@@ -156,9 +190,9 @@ export const QueryGanttHub: React.FC = () => {
             setDebugInfo(`Displaying ${hierarchy.length} root items with ${rawWorkItems.length} total work items`);
         } catch (err) {
             console.error('Failed to execute query:', err);
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            setError(`Failed to execute query: ${errorMessage}`);
-            setDebugInfo(`Query error: ${errorMessage}`);
+            const rawMessage = err instanceof Error ? err.message : String(err);
+            setError(toUserFriendlyError(rawMessage));
+            setDebugInfo(`Query error: ${rawMessage}`);
         } finally {
             setIsLoading(false);
         }
@@ -217,9 +251,9 @@ export const QueryGanttHub: React.FC = () => {
             setDebugInfo(`Displaying ${hierarchy.length} root items with ${rawWorkItems.length} total work items`);
         } catch (err) {
             console.error('Failed to load hierarchical items:', err);
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            setError(`Failed to load: ${errorMessage}`);
-            setDebugInfo(`Error: ${errorMessage}`);
+            const rawMessage = err instanceof Error ? err.message : String(err);
+            setError(toUserFriendlyError(rawMessage));
+            setDebugInfo(`Error: ${rawMessage}`);
         } finally {
             setIsLoading(false);
         }
@@ -303,7 +337,7 @@ export const QueryGanttHub: React.FC = () => {
             {error && (
                 <div className="hub-error">
                     <span className="error-icon">⚠️</span>
-                    {error}
+                    <span className="hub-error-text">{error}</span>
                 </div>
             )}
 

@@ -105,7 +105,26 @@ export const SettingsPanel: React.FC<ISettingsPanelProps> = ({ isOpen, onClose, 
         try {
             const availableFields = await azureDevOpsService.getWorkItemFields();
             const numericFields = availableFields.filter(f => f.isNumeric);
-            setFields(numericFields);
+
+            // Ensure key effort-related fields are always present in the dropdown,
+            // even if the Azure DevOps project doesn't expose them via the fields API.
+            const pinnedFields: IWorkItemField[] = [
+                { referenceName: 'Microsoft.VSTS.Scheduling.OriginalEstimate', name: 'Original Estimate', type: 'double', isNumeric: true },
+                { referenceName: 'Microsoft.VSTS.Scheduling.PlannedHours', name: 'Planned Hours', type: 'double', isNumeric: true },
+                { referenceName: 'Microsoft.VSTS.Scheduling.Effort', name: 'Effort (Story Points)', type: 'double', isNumeric: true },
+                { referenceName: 'Microsoft.VSTS.Scheduling.RemainingWork', name: 'Remaining Work', type: 'double', isNumeric: true },
+                { referenceName: 'Microsoft.VSTS.Scheduling.CompletedWork', name: 'Completed Work', type: 'double', isNumeric: true },
+                { referenceName: 'Microsoft.VSTS.Scheduling.StoryPoints', name: 'Story Points', type: 'double', isNumeric: true },
+            ];
+
+            const merged = [...numericFields];
+            for (const pinned of pinnedFields) {
+                if (!merged.some(f => f.referenceName.toLowerCase() === pinned.referenceName.toLowerCase())) {
+                    merged.push(pinned);
+                }
+            }
+
+            setFields(merged);
         } catch (error) {
             console.error('Failed to load fields:', error);
         } finally {
