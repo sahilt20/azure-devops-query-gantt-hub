@@ -43,7 +43,20 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
     const isCustom = isCustomType(workItem.workItemType);
     const customColor = isCustom ? getCustomTypeColor(workItem.workItemType) : undefined;
     const isRemoved = effortRollupService.isRemovedState(workItem.state);
-    const isBlocked = effortRollupService.isBlockedState(workItem.state);
+
+    // PBI-level items (level 2) with "on hold" state get the on-hold symbol.
+    const isPBILevel = workItem.level === 2 ||
+        ['Product Backlog Item', 'User Story', 'Requirement', 'Bug', 'Issue', 'Release'].includes(workItem.workItemType);
+    const isTaskLevel = workItem.workItemType === 'Task' || workItem.workItemType === 'Test Case';
+
+    // On Hold: only shown for PBI-level items whose state contains "on hold"
+    const isOnHold = isPBILevel && effortRollupService.isOnHoldState(workItem.state);
+
+    // Blocked: for Tasks, check the CMMI Blocked field; for others, use state-based detection
+    // (excluding "on hold" since that already has its own indicator)
+    const isBlocked = isTaskLevel
+        ? (workItem.blocked || effortRollupService.isBlockedState(workItem.state))
+        : (!isOnHold && effortRollupService.isBlockedState(workItem.state));
     const tooltipText = buildWorkItemTooltip(workItem);
     const assigneeInitials = getInitials(workItem.assignedTo);
     const avatarSrc = React.useMemo(() => {
@@ -110,11 +123,20 @@ export const GanttRow: React.FC<IGanttRowProps> = ({
                     {typeAbbr}
                 </span>
 
+                {isOnHold && (
+                    <span
+                        className="gantt-on-hold-indicator"
+                        title="On Hold"
+                        aria-label="On Hold"
+                    >
+                        ⏸
+                    </span>
+                )}
                 {isBlocked && (
                     <span
                         className="gantt-blocked-indicator"
-                        title="Blocked item"
-                        aria-label="Blocked item"
+                        title="Blocked"
+                        aria-label="Blocked"
                     >
                         !
                     </span>
