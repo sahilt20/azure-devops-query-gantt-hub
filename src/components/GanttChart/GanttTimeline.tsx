@@ -1,7 +1,6 @@
 /**
  * Gantt Timeline Component
  * Renders the timeline header with months and days
- * Supports click-to-add-milestone on date columns
  */
 
 import React, { useMemo } from 'react';
@@ -9,25 +8,15 @@ import {
     generateDateRange,
     formatShortDate,
     isWeekend,
-    getColumnWidth,
-    addDays
+    getColumnWidth
 } from '../../utils/DateUtils';
 import { IGanttConfig } from '../../models/WorkItemModels';
 
-export interface IMilestone {
-    id: string;
-    date: Date;
-    label: string;
-    color: string;
-}
-
 interface IGanttTimelineProps {
     config: IGanttConfig;
-    onDateClick?: (date: Date) => void;
-    milestones?: IMilestone[];
 }
 
-export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config, onDateClick, milestones = [] }) => {
+export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config }) => {
     const { startDate, endDate, viewMode } = config;
 
     // Generate dates based on view mode
@@ -109,33 +98,6 @@ export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config, onDateCli
         }
     };
 
-    // Find milestone(s) for a given column date
-    const getMilestonesForDate = (columnDate: Date): IMilestone[] => {
-        return milestones.filter(m => {
-            const md = m.date;
-            if (viewMode === 'day') {
-                return md.toDateString() === columnDate.toDateString();
-            } else if (viewMode === 'week') {
-                const weekEnd = addDays(columnDate, 6);
-                return md >= columnDate && md <= weekEnd;
-            } else {
-                // month view
-                return md.getMonth() === columnDate.getMonth() && md.getFullYear() === columnDate.getFullYear();
-            }
-        });
-    };
-
-    const getClickTitle = (date: Date): string => {
-        if (onDateClick) {
-            const colMilestones = getMilestonesForDate(date);
-            if (colMilestones.length > 0) {
-                return `${colMilestones.map(m => `📌 ${m.label}`).join(', ')} — click to add another milestone`;
-            }
-            return `Click to add milestone: ${formatShortDate(date)}`;
-        }
-        return formatShortDate(date);
-    };
-
     return (
         <div className="gantt-timeline-header" style={{ width: totalWidth }}>
             {/* Header row (Year for month view, Month for day/week view) */}
@@ -153,33 +115,16 @@ export const GanttTimeline: React.FC<IGanttTimelineProps> = ({ config, onDateCli
 
             {/* Date columns row */}
             <div className="gantt-timeline-days">
-                {dates.map((date, index) => {
-                    const colMilestones = getMilestonesForDate(date);
-                    const hasMilestone = colMilestones.length > 0;
-                    return (
-                        <div
-                            key={index}
-                            className={[
-                                'gantt-timeline-day',
-                                viewMode === 'day' && isWeekend(date) ? 'weekend' : '',
-                                isToday(date) ? 'today' : '',
-                                onDateClick ? 'gantt-timeline-day-clickable' : '',
-                                hasMilestone ? 'gantt-timeline-day-has-milestone' : ''
-                            ].filter(Boolean).join(' ')}
-                            style={{ width: columnWidth }}
-                            title={getClickTitle(date)}
-                            onClick={() => onDateClick && onDateClick(date)}
-                        >
-                            {getColumnLabel(date)}
-                            {hasMilestone && (
-                                <span
-                                    className="gantt-timeline-milestone-dot"
-                                    style={{ backgroundColor: colMilestones[0].color }}
-                                />
-                            )}
-                        </div>
-                    );
-                })}
+                {dates.map((date, index) => (
+                    <div
+                        key={index}
+                        className={`gantt-timeline-day ${viewMode === 'day' && isWeekend(date) ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}`}
+                        style={{ width: columnWidth }}
+                        title={formatShortDate(date)}
+                    >
+                        {getColumnLabel(date)}
+                    </div>
+                ))}
             </div>
         </div>
     );

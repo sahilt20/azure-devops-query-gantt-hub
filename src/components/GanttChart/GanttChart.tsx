@@ -19,23 +19,10 @@ import {
 } from '../../utils/DateUtils';
 import { GanttRow } from './GanttRow';
 import { GanttBar } from './GanttBar';
-import { GanttTimeline, IMilestone } from './GanttTimeline';
+import { GanttTimeline } from './GanttTimeline';
 import { DateRangePicker } from './DateRangePicker';
 import { SettingsPanel } from '../FieldConfig/SettingsPanel';
 import './GanttChart.css';
-
-const MILESTONE_COLORS = ['#9f7aea', '#f6ad55', '#68d391', '#f687b3', '#76e4f7', '#fc8181'];
-
-function loadMilestonesFromStorage(): IMilestone[] {
-    try {
-        const stored = localStorage.getItem('gantt-milestones');
-        if (stored) {
-            const parsed = JSON.parse(stored) as Array<{ id: string; date: string; label: string; color: string }>;
-            return parsed.map(m => ({ ...m, date: new Date(m.date) }));
-        }
-    } catch { /* ignore */ }
-    return [];
-}
 
 interface IGanttChartProps {
     workItems: IWorkItemNode[];
@@ -66,13 +53,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
     const [showFieldConfig, setShowFieldConfig] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
-
-    // Milestones / bookmarks
-    const [milestones, setMilestones] = useState<IMilestone[]>(loadMilestonesFromStorage);
-    const [showMilestoneModal, setShowMilestoneModal] = useState(false);
-    const [pendingMilestoneDate, setPendingMilestoneDate] = useState<Date | null>(null);
-    const [milestoneInputLabel, setMilestoneInputLabel] = useState('');
-    const milestoneInputRef = useRef<HTMLInputElement>(null);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
@@ -205,45 +185,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
             workItemHierarchyService.collapseAll(cloned);
             return cloned;
         });
-    }, []);
-
-    // Persist milestones to localStorage whenever they change
-    useEffect(() => {
-        try {
-            localStorage.setItem('gantt-milestones', JSON.stringify(milestones));
-        } catch { /* ignore */ }
-    }, [milestones]);
-
-    // Auto-focus milestone input when modal opens
-    useEffect(() => {
-        if (showMilestoneModal && milestoneInputRef.current) {
-            milestoneInputRef.current.focus();
-        }
-    }, [showMilestoneModal]);
-
-    // Milestone handlers
-    const handleDateClick = useCallback((date: Date) => {
-        setPendingMilestoneDate(date);
-        setMilestoneInputLabel('');
-        setShowMilestoneModal(true);
-    }, []);
-
-    const handleAddMilestone = useCallback(() => {
-        if (!pendingMilestoneDate || !milestoneInputLabel.trim()) return;
-        const newMilestone: IMilestone = {
-            id: `milestone-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            date: pendingMilestoneDate,
-            label: milestoneInputLabel.trim(),
-            color: MILESTONE_COLORS[milestones.length % MILESTONE_COLORS.length]
-        };
-        setMilestones(prev => [...prev, newMilestone]);
-        setShowMilestoneModal(false);
-        setMilestoneInputLabel('');
-        setPendingMilestoneDate(null);
-    }, [pendingMilestoneDate, milestoneInputLabel, milestones.length]);
-
-    const handleRemoveMilestone = useCallback((id: string) => {
-        setMilestones(prev => prev.filter(m => m.id !== id));
     }, []);
 
     // Sync scroll between body and timeline header
@@ -498,11 +439,7 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
 
                 {/* Timeline Header */}
                 <div className="gantt-timeline-header-wrapper" ref={timelineScrollRef}>
-                    <GanttTimeline
-                        config={ganttConfig}
-                        onDateClick={handleDateClick}
-                        milestones={milestones}
-                    />
+                    <GanttTimeline config={ganttConfig} />
                 </div>
             </div>
 
@@ -533,34 +470,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                             )}
                         </div>
 
-                        {/* Milestone / bookmark vertical lines */}
-                        {milestones.map(milestone => {
-                            const pos = getDatePositionPercent(milestone.date, dateRange.start, dateRange.end);
-                            if (pos < 0 || pos > 100) return null;
-                            return (
-                                <div
-                                    key={milestone.id}
-                                    className="gantt-milestone-line"
-                                    style={{ left: `${pos}%`, borderLeftColor: milestone.color }}
-                                    title={`📌 ${milestone.label} — ${milestone.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}\nClick to remove`}
-                                    onClick={() => handleRemoveMilestone(milestone.id)}
-                                >
-                                    <div
-                                        className="gantt-milestone-flag"
-                                        style={{ backgroundColor: milestone.color }}
-                                    >
-                                        📌
-                                    </div>
-                                    <div
-                                        className="gantt-milestone-label"
-                                        style={{ color: milestone.color, borderColor: milestone.color }}
-                                    >
-                                        {milestone.label}
-                                    </div>
-                                </div>
-                            );
-                        })}
-
                         {/* Timeline rows with bars */}
                         {flattenedItems.map(item => {
                             const pos = getBarPosition(item);
@@ -589,67 +498,6 @@ export const GanttChart: React.FC<IGanttChartProps> = ({
                     if (onRefresh) onRefresh();
                 }}
             />
-
-            {/* Milestone / Bookmark Modal */}
-            {showMilestoneModal && pendingMilestoneDate && (
-                <div
-                    className="gantt-milestone-modal-overlay"
-                    onClick={() => setShowMilestoneModal(false)}
-                >
-                    <div
-                        className="gantt-milestone-modal"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        <div className="gantt-milestone-modal-header">
-                            <span>📌 Add Milestone</span>
-                            <button
-                                className="gantt-milestone-modal-close"
-                                onClick={() => setShowMilestoneModal(false)}
-                                aria-label="Close"
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div className="gantt-milestone-modal-body">
-                            <div className="gantt-milestone-modal-date">
-                                {pendingMilestoneDate.toLocaleDateString('en-US', {
-                                    weekday: 'short',
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                })}
-                            </div>
-                            <input
-                                ref={milestoneInputRef}
-                                type="text"
-                                className="gantt-milestone-modal-input"
-                                placeholder="Enter milestone name..."
-                                value={milestoneInputLabel}
-                                onChange={e => setMilestoneInputLabel(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter') handleAddMilestone();
-                                    if (e.key === 'Escape') setShowMilestoneModal(false);
-                                }}
-                            />
-                        </div>
-                        <div className="gantt-milestone-modal-actions">
-                            <button
-                                className="gantt-btn"
-                                onClick={() => setShowMilestoneModal(false)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="gantt-btn gantt-btn-milestone-add"
-                                onClick={handleAddMilestone}
-                                disabled={!milestoneInputLabel.trim()}
-                            >
-                                Add Milestone
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

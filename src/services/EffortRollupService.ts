@@ -291,13 +291,6 @@ class EffortRollupService {
     }
 
     /**
-     * Check if a state specifically represents "on hold" (distinct from generic blocked)
-     */
-    public isOnHoldState(state: string): boolean {
-        return state.toLowerCase().includes('on hold');
-    }
-
-    /**
      * Check if a state represents "in progress"
      */
     private isActiveState(state: string): boolean {

@@ -33,8 +33,7 @@ const BASE_WORK_ITEM_FIELDS = [
     'Microsoft.VSTS.Scheduling.OriginalEstimate',
     'Microsoft.VSTS.Scheduling.RemainingWork',
     'Microsoft.VSTS.Scheduling.CompletedWork',
-    'Microsoft.VSTS.Common.ClosedDate',
-    'Microsoft.VSTS.CMMI.Blocked'
+    'Microsoft.VSTS.Common.ClosedDate'
 ];
 
 interface IClassificationNode {
@@ -514,7 +513,6 @@ class AzureDevOpsService {
     private getDefaultNumericFields(): { referenceName: string; name: string; type: string; isNumeric: boolean }[] {
         return [
             { referenceName: 'Microsoft.VSTS.Scheduling.OriginalEstimate', name: 'Original Estimate', type: 'double', isNumeric: true },
-            { referenceName: 'Microsoft.VSTS.Scheduling.PlannedHours', name: 'Planned Hours', type: 'double', isNumeric: true },
             { referenceName: 'Microsoft.VSTS.Scheduling.RemainingWork', name: 'Remaining Work', type: 'double', isNumeric: true },
             { referenceName: 'Microsoft.VSTS.Scheduling.CompletedWork', name: 'Completed Work', type: 'double', isNumeric: true },
             { referenceName: 'Microsoft.VSTS.Scheduling.Effort', name: 'Effort', type: 'double', isNumeric: true },

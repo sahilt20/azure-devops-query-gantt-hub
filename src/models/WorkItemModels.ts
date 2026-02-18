@@ -47,9 +47,6 @@ export interface IWorkItemNode {
     calculatedStartDate: Date | null;
     calculatedEndDate: Date | null;
     hasValidDates: boolean;         // True if dates are real, false if default 2-day duration
-
-    // CMMI Blocked field (Microsoft.VSTS.CMMI.Blocked = "Yes" / "No")
-    blocked: boolean;
 }
 
 /**
@@ -193,7 +190,6 @@ export function createEmptyWorkItemNode(partial: Partial<IWorkItemNode> = {}): I
         calculatedStartDate: null,
         calculatedEndDate: null,
         hasValidDates: false,
-        blocked: false,
         ...partial
     };
 }

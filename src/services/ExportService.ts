@@ -367,28 +367,26 @@ class ExportService {
                     const avatars = Array.from(doc.querySelectorAll('.gantt-assignee-avatar')) as HTMLElement[];
                     for (const avatar of avatars) {
                         // Force deterministic avatar centering in screenshot clone.
-                        // Use block + position:relative with explicit dimensions so html2canvas
-                        // renders the circle correctly (inline-flex centering is unreliable in canvas).
                         avatar.style.position = 'relative';
                         avatar.style.overflow = 'hidden';
                         avatar.style.borderRadius = '50%';
-                        avatar.style.display = 'block';
-                        avatar.style.width = '20px';
-                        avatar.style.height = '20px';
-                        avatar.style.minWidth = '20px';
-                        avatar.style.minHeight = '20px';
-                        avatar.style.flexShrink = '0';
-                        avatar.style.boxSizing = 'border-box';
-                        avatar.style.verticalAlign = 'middle';
+                        avatar.style.display = 'inline-flex';
+                        avatar.style.alignItems = 'center';
+                        avatar.style.justifyContent = 'center';
 
                         const image = avatar.querySelector('img') as HTMLImageElement | null;
                         const initials = avatar.querySelector('.gantt-assignee-initials') as HTMLElement | null;
+                        if (!image) {
+                            if (initials) {
+                                initials.style.display = 'inline-flex';
+                            }
+                            continue;
+                        }
 
-                        const exportSrc = image?.getAttribute('data-export-src');
-                        if (image && exportSrc) {
+                        const exportSrc = image.getAttribute('data-export-src');
+                        if (exportSrc) {
                             image.src = exportSrc;
                             avatar.classList.add('has-image');
-                            // Fill the circle exactly
                             image.style.position = 'absolute';
                             image.style.top = '0';
                             image.style.left = '0';
@@ -397,31 +395,15 @@ class ExportService {
                             image.style.display = 'block';
                             image.style.objectFit = 'cover';
                             image.style.objectPosition = 'center center';
-                            image.style.transform = 'none';
-                            image.style.margin = '0';
-                            image.style.padding = '0';
+                            image.style.transform = 'translateZ(0)';
                             if (initials) {
                                 initials.style.display = 'none';
                             }
                         } else {
-                            // Show initials centred via absolute positioning.
+                            // Ensure screenshot never shows blank circles.
                             avatar.classList.remove('has-image');
-                            if (image) {
-                                image.style.display = 'none';
-                            }
                             if (initials) {
-                                initials.style.position = 'absolute';
-                                initials.style.top = '0';
-                                initials.style.left = '0';
-                                initials.style.width = '100%';
-                                initials.style.height = '100%';
-                                initials.style.display = 'flex';
-                                initials.style.alignItems = 'center';
-                                initials.style.justifyContent = 'center';
-                                initials.style.lineHeight = '1';
-                                initials.style.textAlign = 'center';
-                                initials.style.margin = '0';
-                                initials.style.padding = '0';
+                                initials.style.display = 'inline-flex';
                             }
                         }
                     }
